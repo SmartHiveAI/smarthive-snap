@@ -8,9 +8,6 @@ description: |
 grade: stable
 confinement: strict
 
-architectures:
-  - all
-
 apps:
   smarthive:
     command: usr/bin/python3 $SNAP/bin/smarthive
