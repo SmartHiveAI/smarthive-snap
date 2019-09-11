@@ -1,6 +1,6 @@
 name: smarthive
 base: core18
-version: '1.0+git'
+version: '1.0.0'
 summary: Smart Hive Cloud controller
 description: |
     Smart Hive Cloud controller snap
@@ -8,13 +8,19 @@ description: |
 grade: stable
 confinement: strict
 
+apps:
+  smarthive:
+    command: usr/bin/python3 $SNAP/bin/smarthive
+    plugs: [network]
+
 parts:
   smarthive:
     plugin: python
     python-version: python3
     source: https://github.com/SmartHiveAI/smarthive-snap.git
+    stage-packages:
+      - python-six
     build-packages:
       - python-gssapi
     python-packages:
       - AWSIoTPythonSDK
-      - six
