@@ -1,12 +1,15 @@
 name: smarthive
 base: core18
-version: '0.0.1'
+version: '0.0.2'
 summary: Smart Hive Cloud controller
 description: |
     Smart Hive Cloud controller snap
 
 grade: stable
 confinement: strict
+
+architectures:
+    - all
 
 apps:
   smarthive:
