@@ -1,12 +1,12 @@
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTShadowClient
 import random, time, uuid, os
 
-SNAP_DATA = os.environ['SNAP_DATA'];
+SNAP_COMMON = os.environ['SNAP_DATA'] + '/../common/';
 SHADOW_CLIENT = "SmartHiveCLC"
 HOST_NAME = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
-ROOT_CA = SNAP_DATA + "/certs/AmazonRootCA1.pem"
-PRIVATE_KEY = SNAP_DATA + "/certs/private.pem.key"
-CERT_FILE = SNAP_DATA + "/certs/certificate.pem.crt"
+ROOT_CA = SNAP_COMMON + "/certs/AmazonRootCA1.pem"
+PRIVATE_KEY = SNAP_COMMON + "/certs/private.pem.key"
+CERT_FILE = SNAP_COMMON + "/certs/certificate.pem.crt"
 SHADOW_HANDLER = "clc-dev-001"
 
 uuid = hex(uuid.getnode());
@@ -29,6 +29,11 @@ myShadowClient.connect()
 myDeviceShadow = myShadowClient.createShadowHandlerWithName(SHADOW_HANDLER, True)
 
 def main():
+    print(os.environ['SNAP']);
+    print(os.environ['SNAP_DATA']);
+    print(os.environ['SNAP_USER_DATA']);
+    print(SNAP_COMMON);
+
     while True:
       moisture = random.choice([True, False])
       if moisture:
@@ -37,5 +42,5 @@ def main():
         myDeviceShadow.shadowUpdate('{"state":{"reported":{"moisture":"low"}}}', myShadowUpdateCallback, 5)
       time.sleep(60)
 
-if __name__== "__main__":
-    main()
+#if __name__== "__main__":
+#    main()
