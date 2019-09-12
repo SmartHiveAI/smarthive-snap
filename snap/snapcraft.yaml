@@ -1,6 +1,6 @@
 name: smarthive
 base: core18
-version: '0.0.2'
+version: '0.0.3'
 summary: Smart Hive Cloud controller
 description: |
     Smart Hive Cloud controller snap
@@ -11,7 +11,8 @@ confinement: strict
 apps:
   smarthive:
     command: usr/bin/python3 $SNAP/bin/smarthive
-    plugs: [network]
+    daemon: simple
+    plugs: [network, network-bind, bluetooth-control]
 
 parts:
   smarthive:

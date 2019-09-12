@@ -1,12 +1,12 @@
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTShadowClient
 import random, time, uuid
 
-SHADOW_CLIENT = "SmartHiveCLC"
-HOST_NAME = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
+SHADOW_CLIENT = "SmartHiveXXX"
+HOST_NAME = "xxx-ats.iot.ap-southeast-1.amazonaws.com"
 ROOT_CA = "/certs/AmazonRootCA1.pem"
-PRIVATE_KEY = "/certs/4ad641e2bc-private.pem.key"
-CERT_FILE = "/certs/4ad641e2bc-certificate.pem.crt"
-SHADOW_HANDLER = "clc-dev-001"
+PRIVATE_KEY = "/certs/xxx-private.pem.key"
+CERT_FILE = "/certs/xxx-certificate.pem.crt"
+SHADOW_HANDLER = "clc-dev-xxx"
 uuid = hex(uuid.getnode());
 
 def myShadowUpdateCallback(payload, responseStatus, token):
