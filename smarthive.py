@@ -7,7 +7,7 @@ HOST_NAME = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
 ROOT_CA = SNAP_COMMON + "/certs/AmazonRootCA1.pem"
 PRIVATE_KEY = SNAP_COMMON + "/certs/private.pem.key"
 CERT_FILE = SNAP_COMMON + "/certs/certificate.pem.crt"
-SHADOW_HANDLER = "clc-dev-001"
+SHADOW_HANDLER = "clc-dev-002"
 
 uuid = hex(uuid.getnode());
 
