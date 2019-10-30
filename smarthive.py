@@ -76,7 +76,7 @@ class CustomHandler(BaseHTTPRequestHandler):
       self.send_header('Content-type','text/html')
       self.end_headers()
       # write the list of ip address as a response. 
-      self.wfile.write("Hello World Smarthive~~")
+      self.wfile.write("Hello World Smarthivedd~~")
       return
     def do_POST(self):
 	    mqtt_publish("Hello World!!")
