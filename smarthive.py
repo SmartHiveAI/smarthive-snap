@@ -1,15 +1,31 @@
-from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTShadowClient
+from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 import random, time, uuid, os
+import logging
+import time
+import argparse
+import json
+from  http.server import BaseHTTPRequestHandler,HTTPServer
+import socket
+import threading
+import logging
+from zeroconf import ServiceInfo, Zeroconf
 
-SNAP_COMMON = os.environ['SNAP_DATA'];
+localHTTP = None
+zeroconf = None
+info = None
+
+SNAP_COMMON = "/home/pi/"
 HOST = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
-ROOT_CA = SNAP_COMMON + "/certs/AmazonRootCA1.pem"
-PRIVATE_KEY = SNAP_COMMON + "/certs/private.pem.key"
-CERT_FILE = SNAP_COMMON + "/certs/certificate.pem.crt"
+ROOT_CA = SNAP_COMMON + "certs/root-CA.crt"
+PRIVATE_KEY = SNAP_COMMON + "certs/clc-us-001.private.key"
+CERT_FILE = SNAP_COMMON + "certs/clc-us-001.cert.pem"
 PORT = 8883
-CLIENT_ID = "SMARTHIVE-001"
+CLIENT_ID = "basicPubSub"
+TOPIC = "sdk/test/Python"
+LOCAL_HOST = "smarthive-clc.local"
+LOCAL_PORT = 4545
 
-uuid = hex(uuid.getnode());
+#uuid = hex(uuid.getnode());
 
 # Custom MQTT message callback
 def customCallback(client, userdata, message):
@@ -43,25 +59,62 @@ myAWSIoTMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
 
 # Connect and subscribe to AWS IoT
 myAWSIoTMQTTClient.connect()
-myAWSIoTMQTTClient.subscribe(topic, 1, customCallback)
+myAWSIoTMQTTClient.subscribe(TOPIC, 1, customCallback)
 time.sleep(2)
 
-def main():
-    print(os.environ['SNAP']);
-    print(os.environ['SNAP_DATA']);
-    print(os.environ['SNAP_USER_DATA']);
-    print(SNAP_COMMON);
 
-    loopCount = 0
-    while True:
-        message = {}
-        message['message'] = args.message
-        message['sequence'] = loopCount
-        messageJson = json.dumps(message)
-        myAWSIoTMQTTClient.publish(topic, messageJson, 1)
-        if args.mode == 'publish':
-            print('Published topic %s: %s\n' % (topic, messageJson))
-        loopCount += 1
-      time.sleep(1)
-#if __name__== "__main__":
-#    main()
+def get_local_address():
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	s.connect(("www.amazon.com", 80))
+	res = s.getsockname()[0]
+	s.close()
+	return res
+
+class CustomHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+            self.send_response(200)
+            self.send_header('Content-type','text/html')
+            self.end_headers()
+            # write the list of ip address as a response. 
+            self.wfile.write("Hello World Smarthive~~")
+            return
+    def do_POST(self):
+	    mqtt_publish("Hello WOrld!!")
+ 
+
+def start():
+	
+	global localHTTP, zeroconf, info, httpthread
+	ip = get_local_address()
+	logging.info("Local IP is " + ip)
+	print("Starting ..........." + ip)
+	desc = {'version': '0.1'}
+	info = ServiceInfo(
+    	    "_http._tcp.local.",
+            "Smarthive CLC._http._tcp.local.",
+            addresses=[socket.inet_aton("127.0.0.1")],
+            port=LOCAL_PORT,
+            properties=desc,
+            server="smarthive-clc.local.",
+    	)
+
+	zeroconf = Zeroconf()
+	zeroconf.register_service(info)
+	print("Local mDNS is started, domain is " + LOCAL_HOST)
+	localHTTP = HTTPServer(("", LOCAL_PORT), CustomHandler)
+	httpthread = threading.Thread(target=localHTTP.serve_forever)
+	httpthread.start()
+	print("Local HTTP is " + ip)
+
+
+def mqtt_publish(message):
+     messageJson = json.dumps(message)   
+     myAWSIoTMQTTClient.publish(TOPIC, messageJson, 1)
+     print('Published topic %s: %s\n' % (TOPIC, messageJson))
+
+
+def main():
+    start()
+
+if __name__== "__main__":
+    main()
