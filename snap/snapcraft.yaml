@@ -25,3 +25,4 @@ parts:
       - python-gssapi
     python-packages:
       - AWSIoTPythonSDK
+      - ZeroConf
