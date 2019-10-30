@@ -102,7 +102,7 @@ def start():
 	localHTTP = HTTPServer(("", LOCAL_PORT), CustomHandler)
 	httpthread = threading.Thread(target=localHTTP.serve_forever)
 	httpthread.start()
-	print("Local HTTP is " + ip)
+	print("Local HTTP is " + ip)  
 
 
 def mqtt_publish(message):
