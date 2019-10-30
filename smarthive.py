@@ -79,7 +79,7 @@ class CustomHandler(BaseHTTPRequestHandler):
       self.wfile.write("Hello World Smarthivedd~~")
       return
     def do_POST(self):
-	    mqtt_publish("Hello World!!")
+      mqtt_publish("Hello World!!")
       self.send_response(200)
       return
 
