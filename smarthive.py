@@ -72,31 +72,29 @@ def get_local_address():
 
 class CustomHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-            self.send_response(200)
-            self.send_header('Content-type','text/html')
-            self.end_headers()
-            # write the list of ip address as a response. 
-            self.wfile.write("Hello World Smarthive~~")
-            return
+      self.send_response(200)
+      self.send_header('Content-type','text/html')
+      self.end_headers()
+      # write the list of ip address as a response. 
+      self.wfile.write("Hello World Smarthive~~")
+      return
     def do_POST(self):
-	    mqtt_publish("Hello WOrld!!")
- 
+	    mqtt_publish("Hello World!!")
+      self.send_response(200)
+      return
+
 
 def start():
-	
 	global localHTTP, zeroconf, info, httpthread
 	ip = get_local_address()
 	logging.info("Local IP is " + ip)
 	print("Starting ..........." + ip)
 	desc = {'version': '0.1'}
-	info = ServiceInfo(
-    	    "_http._tcp.local.",
-            "Smarthive CLC._http._tcp.local.",
-            addresses=[socket.inet_aton("127.0.0.1")],
-            port=LOCAL_PORT,
-            properties=desc,
-            server="smarthive-clc.local.",
-    	)
+
+  info = ServiceInfo("_http._tcp.local.",
+			"SmartHive._http._tcp.local.",
+			socket.inet_aton(ip), LOCAL_PORT, 0, 0,
+			desc, LOCAL_HOST + ".")
 
 	zeroconf = Zeroconf()
 	zeroconf.register_service(info)
