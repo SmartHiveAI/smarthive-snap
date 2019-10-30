@@ -91,7 +91,7 @@ def start():
 	print("Starting ..........." + ip)
 	desc = {'version': '0.1'}
 
-  info = ServiceInfo("_http._tcp.local.",
+  	info = ServiceInfo("_http._tcp.local.",
 			"SmartHive._http._tcp.local.",
 			socket.inet_aton(ip), LOCAL_PORT, 0, 0,
 			desc, LOCAL_HOST + ".")
