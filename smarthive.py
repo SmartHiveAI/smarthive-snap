@@ -76,13 +76,15 @@ def get_local_address():
 class CustomHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
+        #self.send_header("Content-type", "text/html")
+        #self.end_headers()
         # write the list of ip address as a response.
+        print("Received GET call ..........................")
         self.wfile.write("Hello World Smarthivedd~~")
         return
 
     def do_POST(self):
+        print("Received GET call ..........................")
         mqtt_publish("Hello World!!")
         self.send_response(200)
         return
