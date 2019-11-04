@@ -65,6 +65,7 @@ def update_device_state(hub_id, port, addr, state):
      # curl -XPOST https://xxx.co '{"op":"set", "clientId":"60:f8:1d:ce:86:84", "hub_id":"30aea4e7e41c", "port":"K", "addr":0, "state":0}'
      # Create http connection to GW
      gwconnection = http.client.HTTPConnection("smarthive-gw.local", 80)
+     #gwconnection = http.client.HTTPConnection("192.168.1.22", 80)
      gwconnection.set_debuglevel(10);
      gwconnection.request("POST", "/comm", json.dumps(payload), headers)
      response = gwconnection.getresponse()
