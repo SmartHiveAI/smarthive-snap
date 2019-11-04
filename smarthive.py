@@ -17,7 +17,7 @@ zeroconf = None
 info = None
 gwconnection = None
 
-SNAP_COMMON = "/home/pi/"
+SNAP_COMMON = "./"
 HOST = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
 ROOT_CA = SNAP_COMMON + "certs/root-CA.crt"
 PRIVATE_KEY = SNAP_COMMON + "certs/CLC_PRIVATE.pem.key"
@@ -42,8 +42,6 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 streamHandler.setFormatter(formatter)
 logger.addHandler(streamHandler)
 
-#Create http connection to GW
-gwconnection = http.client.HTTPConnection("http://smarthive-gw.local",80)
 
 # Custom MQTT message callback
 def customCallback(client, userdata, message):
@@ -57,18 +55,26 @@ def customCallback(client, userdata, message):
 
 def update_device_state(hub_id, port, addr, state):
     try:
-     headers = {'Content-type': 'application/json', 'X-Dest-Nodes': hub_id}
+     headers = {'Content-type': 'application/json', 'X-Dest-Nodes': hub_id, 'X-Auth-Token': 'SmartHive00'}
      payload = {}
      payload['command'] = "set_thing"
      payload['port'] =  port
-     payload['addr'] = addr
-     payload['state'] = state
-     gwconnection.request("POST","/comm", payload, headers)
+     payload['addr'] = int(addr)
+     payload['state'] = int(state)
+     # curl -XPOST https://xxx.co '{"op":"set", "clientId":"60:f8:1d:ce:86:84", "hub_id":"30aea4e7e41c", "port":"K", "addr":0, "state":1}'
+     # curl -XPOST https://xxx.co '{"op":"set", "clientId":"60:f8:1d:ce:86:84", "hub_id":"30aea4e7e41c", "port":"K", "addr":0, "state":0}'
+     # Create http connection to GW
+     gwconnection = http.client.HTTPConnection("smarthive-gw.local", 80)
+     gwconnection.set_debuglevel(10);
+     gwconnection.request("POST", "/comm", json.dumps(payload), headers)
      response = gwconnection.getresponse()
-     logger.info("HTTP response " + response)
-    except Exception:
+     data = response.read()
+     #logger.info(response.status, response.reason)
+     logger.info(data)
+     gwconnection.close()
+    except Exception as e:
      logger.error("HTTP Error while update device")
-     logger.error(Exception)
+     logger.error(e)
 
 # Init AWSIoTMQTTClient
 mqttClient = None
