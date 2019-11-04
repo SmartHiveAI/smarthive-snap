@@ -26,3 +26,4 @@ parts:
     python-packages:
       - AWSIoTPythonSDK
       - zeroconf
+      - sqlite

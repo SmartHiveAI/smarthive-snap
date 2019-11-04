@@ -9,10 +9,12 @@ import socket
 import threading
 import logging
 from zeroconf import ServiceInfo, Zeroconf
+import http.client
 
 localHTTP = None
 zeroconf = None
 info = None
+gwconnection = None
 
 SNAP_COMMON = "/home/pi/"
 HOST = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
@@ -25,17 +27,6 @@ TOPIC = "sdk/test/Python"
 LOCAL_HOST = "smarthive-clc.local"
 LOCAL_PORT = 4545
 
-# uuid = hex(uuid.getnode());
-
-# Custom MQTT message callback
-def customCallback(client, userdata, message):
-    print("Received a new message: ")
-    print(message.payload)
-    print("from topic: ")
-    print(message.topic)
-    print("--------------\n\n")
-
-
 # Configure logging
 logger = logging.getLogger("AWSIoTPythonSDK.core")
 logger.setLevel(logging.DEBUG)
@@ -44,26 +35,51 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 streamHandler.setFormatter(formatter)
 logger.addHandler(streamHandler)
 
+#Create http connection to GW
+gwconnection = http.client.HTTPConnection("http://smarthive-gw.local",80)
+
+# Custom MQTT message callback
+def customCallback(client, userdata, message):
+    logger.info("Received a new message: ")
+    logger.info(message.payload)
+    logger.info("from topic: ")
+    logger.info(message.topic)
+    payload = json.loads(message.payload)
+    update_device_state(payload['hub_id'], payload['port'], payload['addr'], payload['state'])
+    logger.info("--------------\n\n")
+
+def update_device_state(hub_id, port, addr, state):
+    try:
+     headers = {'Content-type': 'application/json', 'X-Dest-Nodes': hub_id}
+     payload = {}
+     payload['command'] = "set_thing"
+     payload['port'] =  port
+     payload['addr'] = addr
+     payload['state'] = state
+     gwconnection.request("POST","/comm", payload, headers)
+     response = gwconnection.getresponse()
+     logger.info("HTTP response " + response)
+    except Exception:
+     logger.error("HTTP Error while update device")
+     logger.error(Exception)
+
 # Init AWSIoTMQTTClient
-myAWSIoTMQTTClient = None
-myAWSIoTMQTTClient = AWSIoTMQTTClient(CLIENT_ID)
-myAWSIoTMQTTClient.configureEndpoint(HOST, PORT)
-myAWSIoTMQTTClient.configureCredentials(ROOT_CA, PRIVATE_KEY, CERT_FILE)
+mqttClient = None
+mqttClient = AWSIoTMQTTClient(CLIENT_ID)
+mqttClient.configureEndpoint(HOST, PORT)
+mqttClient.configureCredentials(ROOT_CA, PRIVATE_KEY, CERT_FILE)
 
 # AWSIoTMQTTClient connection configuration
-myAWSIoTMQTTClient.configureAutoReconnectBackoffTime(1, 32, 20)
-myAWSIoTMQTTClient.configureOfflinePublishQueueing(
-    -1
-)  # Infinite offline Publish queueing
-myAWSIoTMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
-myAWSIoTMQTTClient.configureConnectDisconnectTimeout(10)  # 10 sec
-myAWSIoTMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
+mqttClient.configureAutoReconnectBackoffTime(1, 32, 20)
+mqttClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
+mqttClient.configureDrainingFrequency(2)  # Draining: 2 Hz
+mqttClient.configureConnectDisconnectTimeout(10)  # 10 sec
+mqttClient.configureMQTTOperationTimeout(5)  # 5 sec
 
 # Connect and subscribe to AWS IoT
-myAWSIoTMQTTClient.connect()
-myAWSIoTMQTTClient.subscribe(TOPIC, 1, customCallback)
+mqttClient.connect()
+mqttClient.subscribe(TOPIC, 1, customCallback)
 time.sleep(2)
-
 
 def get_local_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -76,25 +92,23 @@ def get_local_address():
 class CustomHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        #self.send_header("Content-type", "text/html")
-        #self.end_headers()
         # write the list of ip address as a response.
-        print("Received GET call ..........................")
+        logger.info("Received GET call ..........................")
         self.wfile.write("Hello World Smarthivedd~~")
         return
 
     def do_POST(self):
-        print("Received GET call ..........................")
+        logger.info("Received POST call ..........................")
         mqtt_publish("Hello World!!")
         self.send_response(200)
         return
+
 
 
 def start():
     global localHTTP, zeroconf, info, httpthread
     ip = get_local_address()
     logging.info("Local IP is " + ip)
-    print("Starting ..........." + ip)
     desc = {"version": "0.1"}
     info = ServiceInfo(
         "_http._tcp.local.",
@@ -108,22 +122,19 @@ def start():
     )
     zeroconf = Zeroconf()
     zeroconf.register_service(info)
-    print("Local mDNS is started, domain is " + LOCAL_HOST)
+    logger.info("Local mDNS is started, domain is " + LOCAL_HOST)
     localHTTP = HTTPServer(("", LOCAL_PORT), CustomHandler)
     httpthread = threading.Thread(target=localHTTP.serve_forever)
     httpthread.start()
-    print("Local HTTP is " + ip)
-
 
 def mqtt_publish(message):
     messageJson = json.dumps(message)
-    myAWSIoTMQTTClient.publish(TOPIC, messageJson, 1)
-    print("Published topic %s: %s\n" % (TOPIC, messageJson))
+    mqttClient.publish(TOPIC, messageJson, 1)
+    logger.info("Published topic %s: %s\n" % (TOPIC, messageJson))
 
 
 def main():
     start()
-
 
 if __name__ == "__main__":
     main()
