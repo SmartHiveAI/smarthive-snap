@@ -10,7 +10,8 @@ import threading
 import logging
 from zeroconf import ServiceInfo, Zeroconf
 import http.client
-
+import uuid
+ 
 localHTTP = None
 zeroconf = None
 info = None
@@ -19,14 +20,20 @@ gwconnection = None
 SNAP_COMMON = "/home/pi/"
 HOST = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
 ROOT_CA = SNAP_COMMON + "certs/root-CA.crt"
-PRIVATE_KEY = SNAP_COMMON + "certs/clc-us-001.private.key"
-CERT_FILE = SNAP_COMMON + "certs/clc-us-001.cert.pem"
+PRIVATE_KEY = SNAP_COMMON + "certs/CLC_PRIVATE.pem.key"
+CERT_FILE = SNAP_COMMON + "certs/CLC_CERT.pem.crt"
 PORT = 8883
-CLIENT_ID = "basicPubSub"
-TOPIC = "sdk/test/Python"
+CLIENT_ID = ""
+TOPIC = ""
 LOCAL_HOST = "smarthive-clc.local"
 LOCAL_PORT = 4545
 
+
+
+def mac_addr():
+    return (':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff) 
+    for ele in range(0,8*6,8)][::-1]))  
+    
 # Configure logging
 logger = logging.getLogger("AWSIoTPythonSDK.core")
 logger.setLevel(logging.DEBUG)
@@ -65,6 +72,10 @@ def update_device_state(hub_id, port, addr, state):
 
 # Init AWSIoTMQTTClient
 mqttClient = None
+CLIENT_ID = mac_addr()
+TOPIC = "smarthive/" + CLIENT_ID
+logger.info("---------CLIENT_ID:" + CLIENT_ID)
+logger.info("---------TOPIC:" + TOPIC)
 mqttClient = AWSIoTMQTTClient(CLIENT_ID)
 mqttClient.configureEndpoint(HOST, PORT)
 mqttClient.configureCredentials(ROOT_CA, PRIVATE_KEY, CERT_FILE)
