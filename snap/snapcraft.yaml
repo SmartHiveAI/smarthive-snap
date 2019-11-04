@@ -1,6 +1,6 @@
 name: smarthive
 base: core18
-version: '0.0.4'
+version: '0.0.7'
 summary: Smart Hive Cloud controller
 description: |
     Smart Hive Cloud controller snap
