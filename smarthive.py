@@ -17,11 +17,11 @@ zeroconf = None
 info = None
 gwconnection = None
 
-SNAP_COMMON = "./"
+SNAP_COMMON = os.environ['SNAP_COMMON']
 HOST = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
-ROOT_CA = SNAP_COMMON + "certs/root-CA.crt"
-PRIVATE_KEY = SNAP_COMMON + "certs/CLC_PRIVATE.pem.key"
-CERT_FILE = SNAP_COMMON + "certs/CLC_CERT.pem.crt"
+ROOT_CA = SNAP_COMMON + "/certs/root-CA.crt"
+PRIVATE_KEY = SNAP_COMMON + "/certs/CLC_PRIVATE.pem.key"
+CERT_FILE = SNAP_COMMON + "/certs/CLC_CERT.pem.crt"
 PORT = 8883
 CLIENT_ID = ""
 TOPIC = ""
