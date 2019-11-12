@@ -16,6 +16,7 @@ localHTTP = None
 zeroconf = None
 info = None
 gwconnection = None
+apiGwConnection = None
 
 SNAP_COMMON = os.environ['SNAP_COMMON']
 HOST = "a1x9b1ncwys18b-ats.iot.ap-southeast-1.amazonaws.com"
@@ -28,8 +29,7 @@ CLIENT_ID = ""
 TOPIC = ""
 LOCAL_HOST = "smarthive-clc.local"
 LOCAL_PORT = 4545
-
-
+API_GATEWAY = "awjk4dliq9.execute-api.ap-southeast-1.amazonaws.com"
 
 def mac_addr():
     return (':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff)
@@ -44,15 +44,66 @@ streamHandler.setFormatter(formatter)
 logger.addHandler(streamHandler)
 
 
+#Create gw connection
+def createGWConnection():
+    # Create http connection to GW
+    global gwconnection
+    entries = zeroconf.cache.entries_with_name('SmartHive-GW.local.')
+    if (len(entries) > 0):
+        HOST_GW = str(entries[0])
+        logger.info("Resolved SmartHive-GW IP: %s" % HOST_GW)
+        gwconnection = http.client.HTTPConnection(HOST_GW, 80)
+    else:
+        logger.error('Could not resolve Gateway host')            
+
+def createAPIConnection():
+    try:
+        global apiGwConnection
+        apiGwConnection = http.client.HTTPSConnection(API_GATEWAY)
+        print("Connecting to aws api gateway")
+        print(apiGwConnection)
+    except Exception as e:
+        logger.error(e)
+
 # Custom MQTT message callback
-def customCallback(client, userdata, message):
+def mqttCallback(client, userdata, message):
     logger.info("Received a new message: ")
     logger.info(message.payload)
     logger.info("from topic: ")
     logger.info(message.topic)
     payload = json.loads(message.payload)
-    update_device_state(payload['hub_id'], payload['port'], payload['addr'], payload['state'])
+    if(payload['command']) == 'set_thing':
+        update_device_state(payload['hub_id'], payload['port'], payload['addr'], payload['state'])
+    if(payload['command']) == 'get_mesh_config':
+        get_mesh_config(payload)
+    
 
+def get_mesh_config(payload):
+    try:
+        if gwconnection:
+            gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['hub_id'], 'X-Auth-Token': 'SmartHive00'}
+            gwconnection.request("POST", "/comm", json.dumps(payload), gwHeaders)
+            gwResponse = gwconnection.getresponse()
+            gwResponseData = gwResponse.read()
+            logger.info(gwResponseData)
+            if apiGwConnection:
+                apiGWHeaders = {'Content-type': 'application/json'}
+                apiResponsePayload = {}
+                apiResponsePayload["status"] = "completed"
+                apiResponsePayload["payload"] = gwResponseData
+                apiGwConnection.request("POST", "/prod/job/" + payload['requestId'], json.dumps(apiResponsePayload), apiGWHeaders)
+                apiResponse = apiGwConnection.getresponse()
+                print(apiResponse)
+                apiResponseData = apiResponse.read()
+            else:
+                logger.error("Could not send response to remote")
+        else:
+            logger.error('Could not resolve Gateway host')
+    except Exception as e:
+        logger.error("HTTP Error while update device")
+        logger.error(e)
+        
+        
 def update_device_state(hub_id, port, addr, state):
     try:
         headers = {'Content-type': 'application/json', 'X-Dest-Nodes': hub_id, 'X-Auth-Token': 'SmartHive00'}
@@ -63,19 +114,13 @@ def update_device_state(hub_id, port, addr, state):
         payload['state'] = int(state)
         # curl -XPOST https://xxx.co '{"op":"set", "clientId":"60:f8:1d:ce:86:84", "hub_id":"30aea4e7e41c", "port":"K", "addr":0, "state":1}'
         # curl -XPOST https://xxx.co '{"op":"set", "clientId":"60:f8:1d:ce:86:84", "hub_id":"30aea4e7e41c", "port":"K", "addr":0, "state":0}'
-        # Create http connection to GW
-        entries = zeroconf.cache.entries_with_name('SmartHive-GW.local.');
-        if (len(entries) > 0):
-            HOST_GW = str(entries[0])
-            logger.info("Resolved SmartHive-GW IP: %s" % HOST_GW);
-            gwconnection = http.client.HTTPConnection(HOST_GW, 80)
+        if (gwconnection != None):
             gwconnection.request("POST", "/comm", json.dumps(payload), headers)
             response = gwconnection.getresponse()
             data = response.read()
             logger.info(data)
-            gwconnection.close()
         else:
-            logger.error('Could not resolve Gateway host');
+            logger.error('Could not resolve Gateway host')
     except Exception as e:
         logger.error("HTTP Error while update device")
         logger.error(e)
@@ -99,7 +144,7 @@ mqttClient.configureMQTTOperationTimeout(5)  # 5 sec
 
 # Connect and subscribe to AWS IoT
 mqttClient.connect()
-mqttClient.subscribe(TOPIC, 1, customCallback)
+mqttClient.subscribe(TOPIC, 1, mqttCallback)
 time.sleep(2)
 
 def get_local_address():
@@ -109,8 +154,7 @@ def get_local_address():
     s.close()
     return res
 
-
-class CustomHandler(BaseHTTPRequestHandler):
+class httpCallback(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         # write the list of ip address as a response.
@@ -141,8 +185,10 @@ def start():
     listener = mdnsListener()
     browser = ServiceBrowser(zeroconf, "_http._tcp.local.", listener)
     zeroconf.register_service(info)
+    createGWConnection()
+    createAPIConnection()
     logger.info("Local mDNS on domain: " + LOCAL_HOST)
-    localHTTP = HTTPServer(("", LOCAL_PORT), CustomHandler)
+    localHTTP = HTTPServer(("", LOCAL_PORT), httpCallback)
     httpthread = threading.Thread(target=localHTTP.serve_forever)
     httpthread.start()
 
