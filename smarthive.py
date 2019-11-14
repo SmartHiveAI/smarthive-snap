@@ -66,7 +66,7 @@ def mac_addr():
 #Create gw connection
 def createGWConnection():
     # Create http connection to GW
-    global gMeshConnection
+    global gZeroconf, gMeshConnection
     entries = gZeroconf.cache.entries_with_name('SmartHive-GW.local.')
     if (len(entries) > 0):
         HOST_GW = str(entries[0])
@@ -156,7 +156,7 @@ class httpCallback(BaseHTTPRequestHandler):
 
     def do_GET(self):
         authToken = self.headers['X-Auth-Token']
-        if authToken not in gSUList:
+        if gSUList != None and authToken not in gSUList:
             self.sendResponse(400, 'Bad request', "Invalid credentials. Contact device owner.");
             return
         configJson = json.dumps(dict(gConfig.items('default')))
@@ -282,6 +282,7 @@ def main():
 
 if __name__ == "__main__":
     # Configure logging
+    global gLogger
     gLogger.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     streamHandler = logging.StreamHandler()
