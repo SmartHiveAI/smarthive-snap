@@ -12,7 +12,7 @@ apps:
   smarthive:
     command: usr/bin/python3 $SNAP/bin/smarthive
     daemon: simple
-    plugs: [network, network-bind, bluetooth-control]
+    plugs: [network, network-bind, network-control, bluetooth-control]
 
 parts:
   smarthive:

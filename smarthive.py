@@ -49,6 +49,7 @@ def checkIsProvisioned():
         gConfig.add_section('default')
         gConfig.set('default', 'provisioned', 'no');
         with open(CONFIG_FILE, 'w') as configfile: gConfig.write(configfile)
+    gLogger.info(json.dumps(dict(gConfig.items('default'))))
     if isProvisioned == False:
         gLogger.info('Device not provisioned. Configuration pending.')
     return isProvisioned;
