@@ -16,6 +16,8 @@ CERT_FILE       = CONFIG_FOLDER + "/certs/CLC_CERT.pem.crt"
 MQTT_HOST       = '' # "xxx.iot.zzz.amazonaws.com"
 MQTT_PORT       = 0 # 8883
 API_GATEWAY     = '' # "xxx.execute-api.zzz.amazonaws.com"
+CLIENT_ID       = ''
+TOPIC           = ''
 
 gConfig = configparser.ConfigParser()
 gSUList = None
@@ -134,10 +136,9 @@ def get_local_address():
 
 class httpCallback(BaseHTTPRequestHandler):
     def do_GET(self):
+        logger.info('Config data: %s' % json.dumps(dict(gConfig.items('default'))))
         self.send_response(200)
-        # write the list of ip address as a response.
-        logger.info("Received GET call ..........................")
-        self.wfile.write("Hello World Smarthivedd~~")
+        self.wfile.write(json.dumps(dict(gConfig.items('default'))).encode())
         return
 
     def save_cert(self, fieldName, formData, dstFileName):
@@ -174,9 +175,12 @@ class httpCallback(BaseHTTPRequestHandler):
                     gConfig.set('default', 'MQTT_HOST', formData.getvalue('mqttHost'));
                     gConfig.set('default', 'MQTT_PORT', formData.getvalue('mqttPort'));
                     gConfig.set('default', 'API_GATEWAY', formData.getvalue('apiGateway'));
+                    gConfig.set('default', 'TOPIC', TOPIC)
+                    gConfig.set('default', 'CLIENT_ID', CLIENT_ID)
                     gConfig.set('default', 'ROOT_CA', ROOT_CA)
                     gConfig.set('default', 'CERT_FILE', CERT_FILE)
                     gConfig.set('default', 'PRIVATE_KEY', PRIVATE_KEY)
+
                     with open(CONFIG_FILE, 'w') as configfile: gConfig.write(configfile)
                     if checkIsProvisioned() == True: startComms()
                     self.send_response(200)
@@ -200,12 +204,11 @@ class mdnsListener:
 
 class PubSubHelper:
     def __init__(self):
+        global CLIENT_ID, TOPIC
         # Init AWSIoTMQTTClient
         self.mqttClient = None
-        self.CLIENT_ID = mac_addr()
-        self.TOPIC = "smarthive/" + self.CLIENT_ID
-        logger.info("MQTT config - ClientId: %s, Topic: %s" % (self.CLIENT_ID, self.TOPIC))
-        self.mqttClient = AWSIoTMQTTClient(self.CLIENT_ID)
+        logger.info("MQTT config - ClientId: %s, Topic: %s" % (CLIENT_ID, TOPIC))
+        self.mqttClient = AWSIoTMQTTClient(CLIENT_ID)
         self.mqttClient.configureEndpoint(MQTT_HOST, MQTT_PORT)
         self.mqttClient.configureCredentials(ROOT_CA, PRIVATE_KEY, CERT_FILE)
         # AWSIoTMQTTClient connection configuration
@@ -216,13 +219,13 @@ class PubSubHelper:
         self.mqttClient.configureMQTTOperationTimeout(5)  # 5 sec
         # Connect and subscribe to AWS IoT
         self.mqttClient.connect()
-        self.mqttClient.subscribe(self.TOPIC, 1, self.mqttCallback)
+        self.mqttClient.subscribe(TOPIC, 1, self.mqttCallback)
         time.sleep(2)
 
     def mqtt_publish(self, message):
         messageJson = json.dumps(message)
-        this.mqttClient.publish(self.TOPIC, messageJson, 1)
-        logger.info("Published topic %s: %s\n" % (self.TOPIC, messageJson))
+        this.mqttClient.publish(TOPIC, messageJson, 1)
+        logger.info("Published topic %s: %s\n" % (TOPIC, messageJson))
 
     def mqttCallback(client, userdata, message):
         logger.info("Received message [%s]: %s" % (message.topic, message.payload))
@@ -233,7 +236,9 @@ class PubSubHelper:
             get_mesh_config(payload)
 
 def main():
-    global gZeroconf
+    global gZeroconf, CLIENT_ID, TOPIC
+    CLIENT_ID = mac_addr()
+    TOPIC = "smarthive/" + CLIENT_ID
     # MDNS
     gZeroconf = Zeroconf()
     info = ServiceInfo("_http._tcp.local.", "SmartHive-CLC._http._tcp.local.", socket.inet_aton(get_local_address()), LOCAL_PORT, 0, 0, {"version": "0.1"}, LOCAL_HOST + ".")
