@@ -166,22 +166,24 @@ class httpCallback(BaseHTTPRequestHandler):
             formData = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={'REQUEST_METHOD':'POST', 'CONTENT_TYPE':self.headers['Content-Type']})
             authToken = self.headers['X-Auth-Token']
             logger.info(formData)
-            if checkIsProvisioned() == True and authToken == None:
+            isProvisioned = checkIsProvisioned();
+            if isProvisioned == True and authToken == None:
                 self.send_response(400, 'Bad request')
                 self.wfile.write("Device already provisioned".encode())
                 return
-            elif checkIsProvisioned() == True and authToken != None and authToken not in gSUList:
+            elif isProvisioned == True and authToken != None and authToken not in gSUList:
                 self.send_response(400, 'Bad request')
                 self.wfile.write("Invalid credentials. Contact device owner.".encode())
                 return
-            try:
-                self.save_cert('rootCert', formData, ROOT_CA)
-                self.save_cert('deviceCert', formData, CERT_FILE)
-                self.save_cert('privateKey', formData, PRIVATE_KEY)
-            except:
-                logger.error('Parameter error. Required parameter missing.');
-                self.send_response(400, 'Bad request')
-                return;
+            if isProvisioned == False:
+                try:
+                    self.save_cert('rootCert', formData, ROOT_CA)
+                    self.save_cert('deviceCert', formData, CERT_FILE)
+                    self.save_cert('privateKey', formData, PRIVATE_KEY)
+                except:
+                    logger.error('Parameter error. Required parameter missing.');
+                    self.send_response(400, 'Bad request')
+                    return;
             try:
                 #gConfig.add_section('default')
                 gConfig.set('default', 'provisioned', 'yes');
