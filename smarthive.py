@@ -180,13 +180,15 @@ class httpCallback(BaseHTTPRequestHandler):
                     with open(CONFIG_FILE, 'w') as configfile: gConfig.write(configfile)
                     if checkIsProvisioned() == True: startComms()
                     self.send_response(200)
-                    self.wfile.write("Device provisioning successsful")
+                    self.wfile.write("Device provisioning successsful".encode())
+                    return
                 except Exception as e:
                     logger.error('Could not save config: %s' % str(e));
                     self.send_response(500, 'Internal server error')
+                    return
         else:
             self.send_response(400, 'Bad request')
-            self.wfile.write("Device already provisioned")
+            self.wfile.write("Device already provisioned".encode())
         return
 
 class mdnsListener:
