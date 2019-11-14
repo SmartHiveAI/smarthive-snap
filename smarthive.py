@@ -147,41 +147,46 @@ class httpCallback(BaseHTTPRequestHandler):
         logger.info('Saved file: %s' % dstFileName)
 
     def do_POST(self):
-        length = int(self.headers['content-length'])
-        logger.info("Received POST: %s bytes" % length)
-        if length > 10000000:
-            logger.info("Uploaded file to big");
-            read = 0
-            while read < length: read += len(self.rfile.read(min(66556, length - read)))
-            self.respond("Uploaded file to big")
-            return
-        else:
-            formData = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={'REQUEST_METHOD':'POST', 'CONTENT_TYPE':self.headers['Content-Type']})
-            logger.debug(formData)
-            try:
-                self.save_cert('rootCert', formData, ROOT_CA)
-                self.save_cert('deviceCert', formData, CERT_FILE)
-                self.save_cert('privateKey', formData, PRIVATE_KEY)
-            except:
-                logger.error('Parameter error. Required parameter missing.');
-                self.send_response(400, 'Bad request')
+        if checkIsProvisioned() == False:
+            length = int(self.headers['content-length'])
+            logger.info("Received POST: %s bytes" % length)
+            if length > 10000000:
+                logger.info("Uploaded file to big");
+                read = 0
+                while read < length: read += len(self.rfile.read(min(66556, length - read)))
+                self.respond("Uploaded file to big")
+                return
+            else:
+                formData = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={'REQUEST_METHOD':'POST', 'CONTENT_TYPE':self.headers['Content-Type']})
+                logger.debug(formData)
+                try:
+                    self.save_cert('rootCert', formData, ROOT_CA)
+                    self.save_cert('deviceCert', formData, CERT_FILE)
+                    self.save_cert('privateKey', formData, PRIVATE_KEY)
+                except:
+                    logger.error('Parameter error. Required parameter missing.');
+                    self.send_response(400, 'Bad request')
 
-            try:
-                #gConfig.add_section('default')
-                gConfig.set('default', 'provisioned', 'yes');
-                gConfig.set('default', 'SU_LIST', formData.getvalue('suList'));
-                gConfig.set('default', 'MQTT_HOST', formData.getvalue('mqttHost'));
-                gConfig.set('default', 'MQTT_PORT', formData.getvalue('mqttPort'));
-                gConfig.set('default', 'API_GATEWAY', formData.getvalue('apiGateway'));
-                gConfig.set('default', 'ROOT_CA', ROOT_CA)
-                gConfig.set('default', 'CERT_FILE', CERT_FILE)
-                gConfig.set('default', 'PRIVATE_KEY', PRIVATE_KEY)
-                with open(CONFIG_FILE, 'w') as configfile: gConfig.write(configfile)
-                if checkIsProvisioned() == True: startComms()
-                self.send_response(200, 'Processed request')
-            except Exception as e:
-                logger.error('Could not save config: %s' % str(e));
-                self.send_response(500, 'Internal server error')
+                try:
+                    #gConfig.add_section('default')
+                    gConfig.set('default', 'provisioned', 'yes');
+                    gConfig.set('default', 'SU_LIST', formData.getvalue('suList'));
+                    gConfig.set('default', 'MQTT_HOST', formData.getvalue('mqttHost'));
+                    gConfig.set('default', 'MQTT_PORT', formData.getvalue('mqttPort'));
+                    gConfig.set('default', 'API_GATEWAY', formData.getvalue('apiGateway'));
+                    gConfig.set('default', 'ROOT_CA', ROOT_CA)
+                    gConfig.set('default', 'CERT_FILE', CERT_FILE)
+                    gConfig.set('default', 'PRIVATE_KEY', PRIVATE_KEY)
+                    with open(CONFIG_FILE, 'w') as configfile: gConfig.write(configfile)
+                    if checkIsProvisioned() == True: startComms()
+                    self.send_response(200)
+                    self.wfile.write("Device provisioning successsful")
+                except Exception as e:
+                    logger.error('Could not save config: %s' % str(e));
+                    self.send_response(500, 'Internal server error')
+        else:
+            self.send_response(400, 'Bad request')
+            self.wfile.write("Device already provisioned")
         return
 
 class mdnsListener:
