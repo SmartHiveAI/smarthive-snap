@@ -26,7 +26,7 @@ gMeshConnection = None
 gApiGwConnection = None
 # Configure logging
 gLogger = logging.getLogger("AWSIoTPythonSDK.core")
-gLogger.setLevel(logging.DEBUG)
+gLogger.setLevel(logging.INFO)
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 streamHandler = logging.StreamHandler()
 streamHandler.setFormatter(formatter)
@@ -71,6 +71,7 @@ def mac_addr():
     for ele in range(0,8*6,8)][::-1]))
 
 #Create gw connection
+# TODO: check connection for disconnects and reconnect
 def createGWConnection():
     # Create http connection to GW
     global gZeroconf, gMeshConnection
