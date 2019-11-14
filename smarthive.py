@@ -24,7 +24,14 @@ gSUList = None
 gZeroconf = None
 gMeshConnection = None
 gApiGwConnection = None
+# Configure logging
 gLogger = logging.getLogger("AWSIoTPythonSDK.core")
+gLogger.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+streamHandler = logging.StreamHandler()
+streamHandler.setFormatter(formatter)
+gLogger.addHandler(streamHandler)
+gLogger.info('Starting SmartHive Cloud Controller ...');
 
 def checkIsProvisioned():
     isProvisioned = False;
@@ -281,12 +288,4 @@ def main():
     httpthread.start()
 
 if __name__ == "__main__":
-    # Configure logging
-    global gLogger
-    gLogger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    streamHandler = logging.StreamHandler()
-    streamHandler.setFormatter(formatter)
-    gLogger.addHandler(streamHandler)
-    gLogger.info('Starting SmartHive Cloud Controller ...');
     main()
