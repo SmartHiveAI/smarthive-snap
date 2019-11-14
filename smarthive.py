@@ -71,6 +71,7 @@ def createGWConnection():
     if (len(entries) > 0):
         HOST_GW = str(entries[0])
         gLogger.info("Resolved SmartHive-GW IP: %s" % HOST_GW)
+        if gMeshConnection: gMeshConnection.close()
         gMeshConnection = http.client.HTTPConnection(HOST_GW, 80)
     else:
         gLogger.error('Could not resolve Gateway host')
@@ -78,6 +79,7 @@ def createGWConnection():
 def createAPIConnection():
     try:
         global gApiGwConnection
+        if gApiGwConnection: gApiGwConnection.close()
         gApiGwConnection = http.client.HTTPSConnection(API_GATEWAY)
         gLogger.info("Connecting to aws api gateway")
     except Exception as e:
