@@ -147,7 +147,9 @@ class httpCallback(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Credentials', 'true')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header("Access-Control-Allow-Headers", "X-Auth-Token, X-Requested-With, Content-type")
+        self.send_header("Access-Control-Allow-Headers", "content-type,x-auth-token")
+        self.end_headers()
+        return
 
     def do_GET(self):
         authToken = self.headers['X-Auth-Token']
