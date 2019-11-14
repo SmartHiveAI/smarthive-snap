@@ -24,6 +24,7 @@ gSUList = None
 gZeroconf = None
 gMeshConnection = None
 gApiGwConnection = None
+gLogger = logging.getLogger("AWSIoTPythonSDK.core")
 
 def checkIsProvisioned():
     isProvisioned = False;
@@ -31,8 +32,8 @@ def checkIsProvisioned():
     # check / create cert folder
     if not os.path.exists(certPath):
         try: os.mkdir(certPath)
-        except OSError: logger.error("Creation directory failed: %s" % certPath)
-        else: logger.info("Created directory: %s" % certPath)
+        except OSError: gLogger.error("Creation directory failed: %s" % certPath)
+        else: gLogger.info("Created directory: %s" % certPath)
     # check / create config file
     if (os.path.exists(CONFIG_FILE)):
         gConfig.read(CONFIG_FILE)
@@ -43,13 +44,13 @@ def checkIsProvisioned():
             API_GATEWAY = gConfig.get('default', 'API_GATEWAY')
             gSUList = gConfig.get('default', 'SU_LIST').split(",");
             isProvisioned = True;
-        except Exception as e: logger.info('Configuration read Error: %s' % str(e))
+        except Exception as e: gLogger.info('Configuration read Error: %s' % str(e))
     else:
         gConfig.add_section('default')
         gConfig.set('default', 'provisioned', 'no');
         with open(CONFIG_FILE, 'w') as configfile: gConfig.write(configfile)
     if isProvisioned == False:
-        logger.info('Device not provisioned. Configuration pending.')
+        gLogger.info('Device not provisioned. Configuration pending.')
     return isProvisioned;
 
 def startComms():
@@ -68,18 +69,18 @@ def createGWConnection():
     entries = gZeroconf.cache.entries_with_name('SmartHive-GW.local.')
     if (len(entries) > 0):
         HOST_GW = str(entries[0])
-        logger.info("Resolved SmartHive-GW IP: %s" % HOST_GW)
+        gLogger.info("Resolved SmartHive-GW IP: %s" % HOST_GW)
         gMeshConnection = http.client.HTTPConnection(HOST_GW, 80)
     else:
-        logger.error('Could not resolve Gateway host')
+        gLogger.error('Could not resolve Gateway host')
 
 def createAPIConnection():
     try:
         global gApiGwConnection
         gApiGwConnection = http.client.HTTPSConnection(API_GATEWAY)
-        logger.info("Connecting to aws api gateway")
+        gLogger.info("Connecting to aws api gateway")
     except Exception as e:
-        logger.error('Could not start API connection: %s' % str(e))
+        gLogger.error('Could not start API connection: %s' % str(e))
 
 def get_mesh_config(payload):
     try:
@@ -88,7 +89,7 @@ def get_mesh_config(payload):
             gMeshConnection.request("POST", "/comm", json.dumps(payload), gwHeaders)
             gwResponse = gMeshConnection.getresponse()
             gwResponseData = gwResponse.read()
-            logger.info(gwResponseData)
+            gLogger.info(gwResponseData)
             if gApiGwConnection:
                 apiGWHeaders = {'Content-type': 'application/json'}
                 apiResponsePayload = {}
@@ -99,12 +100,12 @@ def get_mesh_config(payload):
                 print(apiResponse)
                 apiResponseData = apiResponse.read()
             else:
-                logger.error("Could not send response to remote")
+                gLogger.error("Could not send response to remote")
         else:
-            logger.error('Could not resolve Gateway host')
+            gLogger.error('Could not resolve Gateway host')
     except Exception as e:
-        logger.error("HTTP Error while update device")
-        logger.error(e)
+        gLogger.error("HTTP Error while update device")
+        gLogger.error(e)
 
 def update_device_state(hub_id, port, addr, state):
     try:
@@ -120,12 +121,12 @@ def update_device_state(hub_id, port, addr, state):
             gMeshConnection.request("POST", "/comm", json.dumps(payload), headers)
             response = gMeshConnection.getresponse()
             data = response.read()
-            logger.info(data)
+            gLogger.info(data)
         else:
-            logger.error('Could not resolve Gateway host')
+            gLogger.error('Could not resolve Gateway host')
     except Exception as e:
-        logger.error("HTTP Error while update device")
-        logger.error(e)
+        gLogger.error("HTTP Error while update device")
+        gLogger.error(e)
 
 def get_local_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -135,29 +136,40 @@ def get_local_address():
     return res
 
 class httpCallback(BaseHTTPRequestHandler):
+    def sendResponse(self, code, message, body):
+        self.send_response(code, message)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(body.encode())
+
+    def do_OPTIONS(self):
+        self.send_response(200, "ok")
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header("Access-Control-Allow-Headers", "X-Auth-Token, X-Requested-With, Content-type")
+
     def do_GET(self):
         authToken = self.headers['X-Auth-Token']
         if authToken not in gSUList:
-            self.send_response(400, 'Bad request')
-            self.wfile.write("Invalid credentials. Contact device owner.".encode())
+            self.sendResponse(400, 'Bad request', "Invalid credentials. Contact device owner.");
             return
         configJson = json.dumps(dict(gConfig.items('default')))
-        logger.info('Config data: %s' % configJson)
-        self.send_response(200)
-        self.wfile.write(configJson.encode())
+        gLogger.info('Config data: %s' % configJson)
+        self.sendResponse(200, 'ok', configJson);
         return
 
     def save_cert(self, fieldName, formData, dstFileName):
         filename = formData[fieldName].filename
         data = formData[fieldName].file.read()
         open(dstFileName, "wb").write(data)
-        logger.info('Saved file: %s' % dstFileName)
+        gLogger.info('Saved file: %s' % dstFileName)
 
     def do_POST(self):
         length = int(self.headers['content-length'])
-        logger.info("Received POST: %s bytes" % length)
+        gLogger.info("Received POST: %s bytes" % length)
         if length > 10000000:
-            logger.info("Uploaded file to big");
+            gLogger.info("Uploaded file to big");
             read = 0
             while read < length: read += len(self.rfile.read(min(66556, length - read)))
             self.respond("Uploaded file to big")
@@ -165,15 +177,13 @@ class httpCallback(BaseHTTPRequestHandler):
         else:
             formData = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={'REQUEST_METHOD':'POST', 'CONTENT_TYPE':self.headers['Content-Type']})
             authToken = self.headers['X-Auth-Token']
-            logger.info(formData)
+            gLogger.debug(formData)
             isProvisioned = checkIsProvisioned();
             if isProvisioned == True and authToken == None:
-                self.send_response(400, 'Bad request')
-                self.wfile.write("Device already provisioned".encode())
+                self.sendResponse(400, 'Bad request', "Device already provisioned");
                 return
             elif isProvisioned == True and authToken != None and authToken not in gSUList:
-                self.send_response(400, 'Bad request')
-                self.wfile.write("Invalid credentials. Contact device owner.".encode())
+                self.sendResponse(400, 'Bad request', "Invalid credentials. Contact device owner.");
                 return
             if isProvisioned == False:
                 try:
@@ -181,8 +191,8 @@ class httpCallback(BaseHTTPRequestHandler):
                     self.save_cert('deviceCert', formData, CERT_FILE)
                     self.save_cert('privateKey', formData, PRIVATE_KEY)
                 except:
-                    logger.error('Parameter error. Required parameter missing.');
-                    self.send_response(400, 'Bad request')
+                    gLogger.error('Parameter error. Required parameter missing.');
+                    self.sendResponse(400, 'Bad request', "Parameter error. Required parameter missing.");
                     return;
             try:
                 #gConfig.add_section('default')
@@ -198,28 +208,27 @@ class httpCallback(BaseHTTPRequestHandler):
                 gConfig.set('default', 'PRIVATE_KEY', PRIVATE_KEY)
                 with open(CONFIG_FILE, 'w') as configfile: gConfig.write(configfile)
                 if checkIsProvisioned() == True: startComms()
-                self.send_response(200)
-                self.wfile.write("Device provisioning successsful".encode())
+                self.sendResponse(200, 'ok', "Device provisioning successsful");
                 return
             except Exception as e:
-                logger.error('Could not save config: %s' % str(e));
-                self.send_response(500, 'Internal server error')
+                gLogger.error('Could not save config: %s' % str(e));
+                self.sendResponse(500, 'Internal server error', 'Internal Server Error');
                 return
         return
 
 class mdnsListener:
     def remove_service(self, zeroconf, type, name):
-        logger.info("Service removed: %s" % (name,))
+        gLogger.info("Service removed: %s" % (name,))
     def add_service(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
-        logger.info("Service added: %s, ip: %s" % (name, zeroconf.cache.entries_with_name('SmartHive-GW.local.')))
+        gLogger.info("Service added: %s, ip: %s" % (name, zeroconf.cache.entries_with_name('SmartHive-GW.local.')))
 
 class PubSubHelper:
     def __init__(self):
         global CLIENT_ID, TOPIC
         # Init AWSIoTMQTTClient
         self.mqttClient = None
-        logger.info("MQTT config - ClientId: %s, Topic: %s" % (CLIENT_ID, TOPIC))
+        gLogger.info("MQTT config - ClientId: %s, Topic: %s" % (CLIENT_ID, TOPIC))
         self.mqttClient = AWSIoTMQTTClient(CLIENT_ID)
         self.mqttClient.configureEndpoint(MQTT_HOST, MQTT_PORT)
         self.mqttClient.configureCredentials(ROOT_CA, PRIVATE_KEY, CERT_FILE)
@@ -237,10 +246,10 @@ class PubSubHelper:
     def mqtt_publish(self, message):
         messageJson = json.dumps(message)
         this.mqttClient.publish(TOPIC, messageJson, 1)
-        logger.info("Published topic %s: %s\n" % (TOPIC, messageJson))
+        gLogger.info("Published topic %s: %s\n" % (TOPIC, messageJson))
 
     def mqttCallback(client, userdata, message):
-        logger.info("Received message [%s]: %s" % (message.topic, message.payload))
+        gLogger.info("Received message [%s]: %s" % (message.topic, message.payload))
         payload = json.loads(message.payload)
         if(payload['command']) == 'set_thing':
             update_device_state(payload['hub_id'], payload['port'], payload['addr'], payload['state'])
@@ -257,7 +266,7 @@ def main():
     gZeroconf.register_service(info)
     listener = mdnsListener()
     browser = ServiceBrowser(gZeroconf, "_http._tcp.local.", listener)
-    logger.info("Local mDNS on domain: " + LOCAL_HOST)
+    gLogger.info("Local mDNS on domain: " + LOCAL_HOST)
     # Check for provisioning and config
     isProvisioned = checkIsProvisioned();
     if isProvisioned == True: startComms()
@@ -268,10 +277,9 @@ def main():
 
 if __name__ == "__main__":
     # Configure logging
-    logger = logging.getLogger("AWSIoTPythonSDK.core")
-    logger.setLevel(logging.INFO)
+    gLogger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     streamHandler = logging.StreamHandler()
     streamHandler.setFormatter(formatter)
-    logger.addHandler(streamHandler)
+    gLogger.addHandler(streamHandler)
     main()
