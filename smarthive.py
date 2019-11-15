@@ -56,7 +56,7 @@ def checkIsProvisioned():
         gConfig.add_section('default')
         gConfig.set('default', 'provisioned', 'no');
         with open(CONFIG_FILE, 'w') as configfile: gConfig.write(configfile)
-    gLogger.info(json.dumps(dict(gConfig.items('default'))))
+    gLogger.debug(json.dumps(dict(gConfig.items('default'))))
     if isProvisioned == False:
         gLogger.info('Device not provisioned. Configuration pending.')
     return isProvisioned;
@@ -70,7 +70,7 @@ def mac_addr():
     return (':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff)
     for ele in range(0,8*6,8)][::-1]))
 
-#Create gw connection
+# Create gw connection
 # TODO: check connection for disconnects and reconnect
 def createGWConnection():
     # Create http connection to GW
@@ -198,6 +198,7 @@ class httpCallback(BaseHTTPRequestHandler):
             elif isProvisioned == True and authToken != None and authToken not in gSUList:
                 self.sendResponse(400, 'Bad request', "Invalid credentials. Contact device owner.");
                 return
+
             if isProvisioned == False:
                 try:
                     self.save_cert('rootCert', formData, ROOT_CA)
@@ -208,7 +209,6 @@ class httpCallback(BaseHTTPRequestHandler):
                     self.sendResponse(400, 'Bad request', "Parameter error. Required parameter missing.");
                     return;
             try:
-                #gConfig.add_section('default')
                 gConfig.set('default', 'provisioned', 'yes');
                 gConfig.set('default', 'SU_LIST', formData.getvalue('suList'));
                 gConfig.set('default', 'MQTT_HOST', formData.getvalue('mqttHost'));
@@ -261,7 +261,7 @@ class PubSubHelper:
         this.mqttClient.publish(TOPIC, messageJson, 1)
         gLogger.info("Published topic %s: %s\n" % (TOPIC, messageJson))
 
-    def mqttCallback(client, userdata, message):
+    def mqttCallback(self, client, userdata, message):
         gLogger.info("Received message [%s]: %s" % (message.topic, message.payload))
         payload = json.loads(message.payload)
         if(payload['command']) == 'set_thing':
