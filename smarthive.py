@@ -99,8 +99,8 @@ def get_mesh_config(payload):
             gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['hub_id'], 'X-Auth-Token': 'SmartHive00'}
             gMeshConnection.request("POST", "/comm", json.dumps(payload), gwHeaders)
             gwResponse = gMeshConnection.getresponse()
-            gwResponseData = gwResponse.read()
-            gLogger.info(gwResponseData)
+            gwResponseData = gwResponse.read().decode("utf-8")
+            gLogger.info('Response from Mesh Root: %s' % gwResponseData)
             if gApiGwConnection:
                 apiGWHeaders = {'Content-type': 'application/json'}
                 apiResponsePayload = {}
@@ -108,7 +108,7 @@ def get_mesh_config(payload):
                 apiResponsePayload["payload"] = gwResponseData
                 gApiGwConnection.request("POST", "/prod/job/" + payload['requestId'], json.dumps(apiResponsePayload), apiGWHeaders)
                 apiResponse = gApiGwConnection.getresponse()
-                print(apiResponse)
+                gLogger.info('Response from API GW' % apiResponse.read().decode("utf-8"))
                 apiResponseData = apiResponse.read()
             else:
                 gLogger.error("Could not send response to remote")
