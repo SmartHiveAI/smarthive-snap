@@ -93,52 +93,6 @@ def createAPIConnection():
     except Exception as e:
         gLogger.error('Could not start API connection: %s' % str(e))
 
-def get_mesh_config(payload):
-    try:
-        if gMeshConnection:
-            gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['hub_id'], 'X-Auth-Token': 'SmartHive00'}
-            gMeshConnection.request("POST", "/comm", json.dumps(payload), gwHeaders)
-            gwResponse = gMeshConnection.getresponse()
-            gwResponseData = gwResponse.read().decode("utf-8")
-            gLogger.info('Response from Mesh Root: %s' % gwResponseData)
-            if gApiGwConnection:
-                apiGWHeaders = {'Content-type': 'application/json'}
-                apiResponsePayload = {}
-                apiResponsePayload["status"] = "completed"
-                apiResponsePayload["payload"] = gwResponseData
-                gApiGwConnection.request("POST", "/prod/job/" + payload['requestId'], json.dumps(apiResponsePayload), apiGWHeaders)
-                apiResponse = gApiGwConnection.getresponse()
-                gLogger.info('Response from API GW' % apiResponse.read().decode("utf-8"))
-                apiResponseData = apiResponse.read()
-            else:
-                gLogger.error("Could not send response to remote")
-        else:
-            gLogger.error('Could not resolve Gateway host')
-    except Exception as e:
-        gLogger.error("HTTP Error while update device")
-        gLogger.error(e)
-
-def update_device_state(hub_id, port, addr, state):
-    try:
-        headers = {'Content-type': 'application/json', 'X-Dest-Nodes': hub_id, 'X-Auth-Token': 'SmartHive00'}
-        payload = {}
-        payload['command'] = "set_thing"
-        payload['port'] =  port
-        payload['addr'] = int(addr)
-        payload['state'] = int(state)
-        # curl -XPOST https://xxx.co '{"op":"set", "clientId":"60:f8:1d:ce:86:84", "hub_id":"30aea4e7e41c", "port":"K", "addr":0, "state":1}'
-        # curl -XPOST https://xxx.co '{"op":"set", "clientId":"60:f8:1d:ce:86:84", "hub_id":"30aea4e7e41c", "port":"K", "addr":0, "state":0}'
-        if (gMeshConnection != None):
-            gMeshConnection.request("POST", "/comm", json.dumps(payload), headers)
-            response = gMeshConnection.getresponse()
-            data = response.read()
-            gLogger.info(data)
-        else:
-            gLogger.error('Could not resolve Gateway host')
-    except Exception as e:
-        gLogger.error("HTTP Error while update device")
-        gLogger.error(e)
-
 def get_local_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(("www.amazon.com", 80))
@@ -237,6 +191,28 @@ class mdnsListener:
         gLogger.info("Service added: %s, ip: %s" % (name, zeroconf.cache.entries_with_name('SmartHive-GW.local.')))
 
 class PubSubHelper:
+    def pass_thru_command(self, payload):
+        try:
+            if gMeshConnection:
+                gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': 'ffffffffffff', 'X-Auth-Token': 'SmartHive00'}
+                gMeshConnection.request("POST", "/comm", json.dumps(payload), gwHeaders)
+                gwResponse = gMeshConnection.getresponse()
+                gwResponseData = gwResponse.read().decode("utf-8")
+                gLogger.info('Response from Mesh Root: %s' % gwResponseData)
+                if gApiGwConnection:
+                    apiGWHeaders = {'Content-type': 'application/json'}
+                    apiResponsePayload = {}
+                    apiResponsePayload["status"] = "completed"
+                    apiResponsePayload["payload"] = gwResponseData
+                    gApiGwConnection.request("POST", "/prod/job/" + payload['requestId'], json.dumps(apiResponsePayload), apiGWHeaders)
+                    apiResponse = gApiGwConnection.getresponse()
+                    gLogger.info('Response from API GW' % apiResponse.read().decode("utf-8"))
+                    apiResponseData = apiResponse.read()
+                else: gLogger.error("Could not send response to remote")
+            else: gLogger.error('Could not resolve Gateway host')
+        except Exception as e:
+            gLogger.error("pass_thru_command Error: %s" % str(e))
+
     def __init__(self):
         global CLIENT_ID, TOPIC
         # Init AWSIoTMQTTClient
@@ -263,11 +239,8 @@ class PubSubHelper:
 
     def mqttCallback(self, client, userdata, message):
         gLogger.info("Received message [%s]: %s" % (message.topic, message.payload))
-        payload = json.loads(message.payload)
-        if(payload['command']) == 'set_thing':
-            update_device_state(payload['hub_id'], payload['port'], payload['addr'], payload['state'])
-        if(payload['command']) == 'get_mesh_config':
-            get_mesh_config(payload)
+        payload = json.loads(message.payload.decode("utf-8"))
+        self.pass_thru_command(payload)
 
 def main():
     global gZeroconf, CLIENT_ID, TOPIC
