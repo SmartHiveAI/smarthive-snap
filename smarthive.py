@@ -191,29 +191,6 @@ class mdnsListener:
         gLogger.info("Service added: %s, ip: %s" % (name, zeroconf.cache.entries_with_name('SmartHive-GW.local.')))
 
 class PubSubHelper:
-    def pass_thru_command(self, content):
-        payload = json.loads(content.decode("utf-8"))
-        try:
-            if gMeshConnection:
-                gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['headers']['X-Dest-Nodes'], 'X-Auth-Token': payload['headers']['X-Auth-Token']}
-                gMeshConnection.request("POST", "/comm", json.dumps(payload['content']), gwHeaders)
-                gwResponse = gMeshConnection.getresponse()
-                gwResponseData = gwResponse.read().decode("utf-8")
-                gLogger.info('Response from Mesh Root: %s' % gwResponseData)
-                if gApiGwConnection:
-                    apiGWHeaders = {'Content-type': 'application/json'}
-                    apiResponsePayload = {}
-                    apiResponsePayload["status"] = "completed"
-                    apiResponsePayload["payload"] = gwResponseData
-                    gApiGwConnection.request("POST", "/prod/job/" + payload['requestId'], json.dumps(apiResponsePayload), apiGWHeaders)
-                    apiResponse = gApiGwConnection.getresponse()
-                    gLogger.info('Response from API GW' % apiResponse.read().decode("utf-8"))
-                    apiResponseData = apiResponse.read()
-                else: gLogger.error("Could not send response to remote")
-            else: gLogger.error('Could not resolve Gateway host')
-        except Exception as e:
-            gLogger.error("pass_thru_command Error: %s" % str(e))
-
     def __init__(self):
         global CLIENT_ID, TOPIC
         # Init AWSIoTMQTTClient
@@ -240,7 +217,30 @@ class PubSubHelper:
 
     def mqttCallback(self, client, userdata, message):
         gLogger.info("Received message [%s]: %s" % (message.topic, message.payload.decode("utf-8")))
-        self.pass_thru_command(message.payload)
+        self.passThruCommand(message.payload)
+
+    def passThruCommand(self, content):
+        payload = json.loads(content.decode("utf-8"))
+        try:
+            if gMeshConnection:
+                gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['headers']['X-Dest-Nodes'], 'X-Auth-Token': payload['headers']['X-Auth-Token']}
+                gMeshConnection.request("POST", "/comm", json.dumps(payload['content']), gwHeaders)
+                gwResponse = gMeshConnection.getresponse()
+                gwResponseData = gwResponse.read().decode("utf-8")
+                gLogger.info('Response from Mesh Root: %s' % gwResponseData)
+                if gApiGwConnection:
+                    apiGWHeaders = {'Content-type': 'application/json'}
+                    apiResponsePayload = {}
+                    apiResponsePayload["status"] = "completed"
+                    apiResponsePayload["payload"] = gwResponseData
+                    gApiGwConnection.request("POST", "/prod/job/" + payload['requestId'], json.dumps(apiResponsePayload), apiGWHeaders)
+                    apiResponse = gApiGwConnection.getresponse()
+                    apiResponseData = apiResponse.read().decode("utf-8")
+                    gLogger.info('Response from API GW: %s' % apiResponseData)
+                else: gLogger.error("Could not send response from Mesh")
+            else: gLogger.error('Could not resolve Gateway host')
+        except Exception as e:
+            gLogger.error("pass_thru_command Error: %s" % str(e))
 
 def main():
     global gZeroconf, CLIENT_ID, TOPIC
