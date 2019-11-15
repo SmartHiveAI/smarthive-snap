@@ -191,11 +191,12 @@ class mdnsListener:
         gLogger.info("Service added: %s, ip: %s" % (name, zeroconf.cache.entries_with_name('SmartHive-GW.local.')))
 
 class PubSubHelper:
-    def pass_thru_command(self, payload):
+    def pass_thru_command(self, content):
+        payload = json.loads(content.decode("utf-8"))
         try:
             if gMeshConnection:
-                gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': 'ffffffffffff', 'X-Auth-Token': 'SmartHive00'}
-                gMeshConnection.request("POST", "/comm", json.dumps(payload), gwHeaders)
+                gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['headers']['X-Dest-Nodes'], 'X-Auth-Token': payload['headers']['X-Auth-Token']}
+                gMeshConnection.request("POST", "/comm", json.dumps(payload['content']), gwHeaders)
                 gwResponse = gMeshConnection.getresponse()
                 gwResponseData = gwResponse.read().decode("utf-8")
                 gLogger.info('Response from Mesh Root: %s' % gwResponseData)
@@ -239,8 +240,7 @@ class PubSubHelper:
 
     def mqttCallback(self, client, userdata, message):
         gLogger.info("Received message [%s]: %s" % (message.topic, message.payload.decode("utf-8")))
-        payload = json.loads(message.payload.decode("utf-8"))
-        self.pass_thru_command(payload)
+        self.pass_thru_command(message.payload)
 
 def main():
     global gZeroconf, CLIENT_ID, TOPIC
