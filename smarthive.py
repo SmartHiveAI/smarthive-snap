@@ -238,14 +238,14 @@ class PubSubHelper:
         gLogger.info("Published topic %s: %s\n" % (TOPIC, messageJson))
 
     def mqttCallback(self, client, userdata, message):
-        gLogger.info("Received message [%s]: %s" % (message.topic, message.payload))
+        gLogger.info("Received message [%s]: %s" % (message.topic, message.payload.decode("utf-8")))
         payload = json.loads(message.payload.decode("utf-8"))
         self.pass_thru_command(payload)
 
 def main():
     global gZeroconf, CLIENT_ID, TOPIC
     CLIENT_ID = mac_addr()
-    TOPIC = "smarthive/" + CLIENT_ID
+    TOPIC = "smarthive/" + CLIENT_ID.replace(":", "")
     # MDNS
     gZeroconf = Zeroconf()
     info = ServiceInfo("_http._tcp.local.", "SmartHive-CLC._http._tcp.local.", socket.inet_aton(get_local_address()), LOCAL_PORT, 0, 0, {"version": "0.1"}, LOCAL_HOST + ".")
