@@ -232,8 +232,6 @@ class PubSubHelper:
         try:
             if gMeshConnection:
                 gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['headers']['X-Dest-Nodes'], 'X-Auth-Token': payload['headers']['X-Auth-Token']}
-                # check multiple commands
-                #contentJson = json.loads(payload['content']);
                 gwResponseData = None
                 if 'command' in payload['content']:
                     gwResponseData = self.sendOneCommand(gwHeaders, payload['content'])
