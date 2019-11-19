@@ -219,20 +219,33 @@ class PubSubHelper:
         gLogger.info("Received message [%s]: %s" % (message.topic, message.payload.decode("utf-8")))
         self.passThruCommand(message.payload)
 
+    def sendOneCommand(self, headers, command):
+        gLogger.info('Command for Mesh Root: %s' % command)
+        gMeshConnection.request("POST", "/comm", json.dumps(command), headers)
+        gwResponse = gMeshConnection.getresponse()
+        gwResponseData = gwResponse.read().decode("utf-8")
+        gLogger.info('Response from Mesh Root: %s' % gwResponseData)
+        return gwResponseData
+
     def passThruCommand(self, content):
         payload = json.loads(content.decode("utf-8"))
         try:
             if gMeshConnection:
                 gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['headers']['X-Dest-Nodes'], 'X-Auth-Token': payload['headers']['X-Auth-Token']}
-                gMeshConnection.request("POST", "/comm", json.dumps(payload['content']), gwHeaders)
-                gwResponse = gMeshConnection.getresponse()
-                gwResponseData = gwResponse.read().decode("utf-8")
-                gLogger.info('Response from Mesh Root: %s' % gwResponseData)
+                # check multiple commands
+                #contentJson = json.loads(payload['content']);
+                gwResponseData = None
+                if 'command' in payload['content']:
+                    gwResponseData = self.sendOneCommand(gwHeaders, payload['content'])
+                else:
+                    for commandId in payload['content']:
+                        if gwResponseData is None: gwResponseData = {}
+                        gwResponseData[commandId] = self.sendOneCommand(gwHeaders, payload['content'][commandId])
                 if gApiGwConnection:
-                    apiGWHeaders = {'Content-type': 'application/json'}
                     apiResponsePayload = {}
+                    apiGWHeaders = {'Content-type': 'application/json'}
                     apiResponsePayload["status"] = "completed"
-                    apiResponsePayload["payload"] = gwResponseData
+                    apiResponsePayload["payload"] = json.dumps(gwResponseData)
                     gApiGwConnection.request("POST", "/prod/job/" + payload['requestId'], json.dumps(apiResponsePayload), apiGWHeaders)
                     apiResponse = gApiGwConnection.getresponse()
                     apiResponseData = apiResponse.read().decode("utf-8")
