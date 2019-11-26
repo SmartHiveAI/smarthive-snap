@@ -188,7 +188,7 @@ class mdnsListener:
         gLogger.info("Service removed: %s" % (name,))
     def add_service(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
-        gLogger.info("Service added: %s, ip: %s" % (name, zeroconf.cache.entries_with_name('SmartHive-GW.local.')))
+        gLogger.info("Service added: %s, ip: %s" % (name, zeroconf.cache.entries_with_name(name)))
 
 class PubSubHelper:
     def __init__(self):
@@ -231,13 +231,15 @@ class PubSubHelper:
         payload = json.loads(content.decode("utf-8"))
         try:
             if gMeshConnection:
-                gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['headers']['X-Dest-Nodes'], 'X-Auth-Token': payload['headers']['X-Auth-Token']}
                 gwResponseData = None
                 if 'command' in payload['content']:
+                    gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['headers']['X-Dest-Nodes'], 'X-Auth-Token': payload['headers']['X-Auth-Token']}
                     gwResponseData = self.sendOneCommand(gwHeaders, payload['content'])
                 else:
+                    # Hetero hub commands
                     for commandId in payload['content']:
                         if gwResponseData is None: gwResponseData = {}
+                        gwHeaders = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['content'][commandId]['hub'].replace(":", ""), 'X-Auth-Token': payload['headers']['X-Auth-Token']}
                         gwResponseData[commandId] = self.sendOneCommand(gwHeaders, payload['content'][commandId])
                 if gApiGwConnection:
                     apiResponsePayload = {}
