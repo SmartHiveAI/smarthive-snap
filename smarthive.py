@@ -187,8 +187,8 @@ class mdnsListener:
     def remove_service(self, zeroconf, type, name):
         gLogger.info("Service removed: %s" % (name,))
     def add_service(self, zeroconf, type, name):
-        info = zeroconf.get_service_info(type, name)
-        gLogger.info("Service added: %s, ip: %s" % (name, zeroconf.cache.entries_with_name(name)))
+        info = gZeroconf.get_service_info(type, name)
+        gLogger.info("Service added: %s, ip: %s" % (name, gZeroconf.cache.entries_with_name(name)))
 
 class PubSubHelper:
     def __init__(self):
