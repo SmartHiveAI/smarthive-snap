@@ -13,6 +13,7 @@ import socket
 import threading
 from urllib3 import HTTPConnectionPool, HTTPSConnectionPool
 from zeroconf import ServiceInfo, ServiceBrowser, Zeroconf
+import AWSIoTPythonSDK
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 
 SNAP_COMMON = os.environ['SNAP_COMMON']
@@ -195,19 +196,21 @@ class PubSubHelper:
     '''Helper class to receive commands over MQTT, pass through to Mesh and respond back to the cloud gateway'''
     def __init__(self):
         self.conn_mgr = HTTPConnPoolMgr()
+
         LOGGER.info("MQTT config - ClientId: %s, Topic: %s", CLIENT_ID, TOPIC)
         self.mqtt_client = None
         self.mqtt_client = AWSIoTMQTTClient(CLIENT_ID)
         self.mqtt_client.configureEndpoint(MQTT_HOST, MQTT_PORT)
         self.mqtt_client.configureCredentials(ROOT_CA, PRIVATE_KEY, CERT_FILE)
-        self.mqtt_client.configureAutoReconnectBackoffTime(1, 32, 20)
-        self.mqtt_client.configureOfflinePublishQueueing(-1) # Infinite offline Publish queueing
+        self.mqtt_client.configureAutoReconnectBackoffTime(1, 60, 10) # 1 - 60 seconds backoff, 10 sec stable reset
+        self.mqtt_client.configureOfflinePublishQueueing(100, AWSIoTPythonSDK.MQTTLib.DROP_OLDEST) # queue 100 requests
         self.mqtt_client.configureDrainingFrequency(2)  # Draining: 2 Hz
         self.mqtt_client.configureConnectDisconnectTimeout(10)  # 10 sec
         self.mqtt_client.configureMQTTOperationTimeout(5)  # 5 sec
-        self.mqtt_client.connect()
+        self.mqtt_client.enableMetricsCollection()
+        self.mqtt_client.connect(60)
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
-        time.sleep(2)
+        # time.sleep(2)
 
     def mqtt_publish(self, message):
         '''Send data over MQTT'''

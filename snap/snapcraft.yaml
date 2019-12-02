@@ -27,3 +27,4 @@ parts:
       - AWSIoTPythonSDK
       - zeroconf
       - configparser
+      - urllib3
