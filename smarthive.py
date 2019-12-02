@@ -33,13 +33,8 @@ SH_CONFIG = configparser.ConfigParser()
 SU_LIST = None
 ZERO_CONF = Zeroconf()
 LOGGER = logging.getLogger("AWSIoTPythonSDK.core")
-LOGGER.setLevel(logging.INFO)
-streamHandler = logging.StreamHandler()
-streamHandler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-LOGGER.addHandler(streamHandler)
-LOGGER.info('Starting SmartHive Cloud Controller ...')
 
-def checkIsProvisioned():
+def check_provisioned():
     '''Check if Hub has been factory provisioned with the right certs'''
     is_provisioned = False
     cert_path = CONFIG_FOLDER + "/certs"
@@ -146,7 +141,7 @@ class HTTPCallback(BaseHTTPRequestHandler):
             form_data = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']})
             auth_token = self.headers['X-Auth-Token']
             LOGGER.debug(form_data)
-            is_provisioned = checkIsProvisioned()
+            is_provisioned = check_provisioned()
             if is_provisioned is True and auth_token is None:
                 self.send_cors_response(400, 'Bad request', 'Device already provisioned')
                 return
@@ -175,10 +170,7 @@ class HTTPCallback(BaseHTTPRequestHandler):
                 SH_CONFIG.set('default', 'CERT_FILE', CERT_FILE)
                 SH_CONFIG.set('default', 'PRIVATE_KEY', PRIVATE_KEY)
                 with open(CONFIG_FILE, 'w') as configfile: SH_CONFIG.write(configfile)
-                ''' XXX: check this on provisioning
-                if checkIsProvisioned() == True:
-                    startComms()
-                '''
+                if check_provisioned() == True: PubSubHelper()
                 self.send_cors_response(200, 'ok', 'Device provisioning successsful')
                 return
             except Exception as e:
@@ -200,43 +192,43 @@ class MDNSListener:
 
 
 class PubSubHelper:
+    '''Helper class to receive commands over MQTT, pass through to Mesh and respond back to the cloud gateway'''
     def __init__(self):
-        # Create API GW Conn
         self.conn_mgr = HTTPConnPoolMgr()
-        # Init AWSIoTMQTTClient
-        self.mqtt_client = None
         LOGGER.info("MQTT config - ClientId: %s, Topic: %s", CLIENT_ID, TOPIC)
+        self.mqtt_client = None
         self.mqtt_client = AWSIoTMQTTClient(CLIENT_ID)
         self.mqtt_client.configureEndpoint(MQTT_HOST, MQTT_PORT)
         self.mqtt_client.configureCredentials(ROOT_CA, PRIVATE_KEY, CERT_FILE)
-        # AWSIoTMQTTClient connection configuration
         self.mqtt_client.configureAutoReconnectBackoffTime(1, 32, 20)
-        # Infinite offline Publish queueing
-        self.mqtt_client.configureOfflinePublishQueueing(-1)
+        self.mqtt_client.configureOfflinePublishQueueing(-1) # Infinite offline Publish queueing
         self.mqtt_client.configureDrainingFrequency(2)  # Draining: 2 Hz
         self.mqtt_client.configureConnectDisconnectTimeout(10)  # 10 sec
         self.mqtt_client.configureMQTTOperationTimeout(5)  # 5 sec
-        # Connect and subscribe to AWS IoT
         self.mqtt_client.connect()
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
         time.sleep(2)
 
     def mqtt_publish(self, message):
+        '''Send data over MQTT'''
         message_str = json.dumps(message)
         self.mqtt_client.publish(TOPIC, message_str, 1)
         LOGGER.info("Published topic %s: %s", TOPIC, message_str)
 
     def mqtt_callback(self, client, userdata, message):
+        '''Received data over MQTT'''
         LOGGER.info("Received message [%s]: %s", message.topic, message.payload.decode("utf-8"))
         self.pass_thru_command(message.payload)
 
     def send_one_command(self, headers, command):
+        '''Send on command to the mesh gateway over HTTP'''
         LOGGER.info('Command for Mesh Root: %s', command)
         mesh_response = self.conn_mgr.sendMeshCommand(headers, json.dumps(command))
         LOGGER.info('Response from Mesh Root: %s', mesh_response)
         return mesh_response
 
     def pass_thru_command(self, content):
+        '''Pass through command(s) received via MQTT to the Mesh'''
         payload = json.loads(content.decode("utf-8"))
         try:
             mesh_response = None
@@ -260,6 +252,7 @@ class PubSubHelper:
 
 
 def get_local_address():
+    '''Get local LAN address'''
     sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock_fd.connect(("www.amazon.com", 80))
     res = sock_fd.getsockname()[0]
@@ -268,16 +261,23 @@ def get_local_address():
 
 
 def main():
+    '''Main entry point - configures and starts - logger, mdns, provisioning check and http'''
+    LOGGER.setLevel(logging.INFO)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    LOGGER.addHandler(stream_handler)
+    LOGGER.info('Starting SmartHive Cloud Controller ...')
     # MDNS
     info = ServiceInfo("_http._tcp.local.", "SmartHive-CLC._http._tcp.local.", socket.inet_aton(get_local_address()), LOCAL_PORT, 0, 0, {"version": "0.1"}, LOCAL_HOST + ".")
     ZERO_CONF.register_service(info)
     listener = MDNSListener()
     ServiceBrowser(ZERO_CONF, "_http._tcp.local.", listener)
     LOGGER.info("Local mDNS on domain: %s", LOCAL_HOST)
-    # Check for provisioning and config
-    is_provisioned = checkIsProvisioned()
+    # Check for provisioning status and config
+    is_provisioned = check_provisioned()
+    LOGGER.info("Provisioned status: %s", is_provisioned)
     if is_provisioned is True: PubSubHelper()
-    # local http server
+    # Local http server
     local_svr = HTTPServer(("", LOCAL_PORT), HTTPCallback)
     httpthread = threading.Thread(target=local_svr.serve_forever)
     httpthread.start()
