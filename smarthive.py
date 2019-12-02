@@ -40,9 +40,9 @@ LOGGER.addHandler(streamHandler)
 LOGGER.info('Starting SmartHive Cloud Controller ...')
 
 def checkIsProvisioned():
+    '''Check if Hub has been factory provisioned with the right certs'''
     is_provisioned = False
     cert_path = CONFIG_FOLDER + "/certs"
-    # check / create cert folder
     if not os.path.exists(cert_path):
         try:
             os.mkdir(cert_path)
@@ -50,8 +50,7 @@ def checkIsProvisioned():
             LOGGER.error("Creation directory failed: %s", cert_path)
         else:
             LOGGER.info("Created directory: %s", cert_path)
-    # check / create config file
-    if (os.path.exists(CONFIG_FILE)):
+    if os.path.exists(CONFIG_FILE):
         SH_CONFIG.read(CONFIG_FILE)
         try:
             global MQTT_HOST, MQTT_PORT, API_GATEWAY, SU_LIST
@@ -74,11 +73,13 @@ def checkIsProvisioned():
 
 
 class HTTPConnPoolMgr:
+    '''Manage Connection pools for the cloud gateway and the local mesh'''
     def __init__(self):
         self.api_pool = HTTPSConnectionPool(API_GATEWAY, port=443, maxsize=10, block=True, headers=None)
         self.initMeshPool()
 
     def initMeshPool(self):
+        '''Initialize connection pool with local mesh'''
         entries = ZERO_CONF.cache.entries_with_name('SmartHive-GW.local.')
         if len(entries) > 0:
             gw_host = str(entries[0])
@@ -89,17 +90,20 @@ class HTTPConnPoolMgr:
             LOGGER.error('Could not resolve Gateway host')
 
     def sendJobStatusRequest(self, requestId, headers, payload):
+        '''Send back job status to the Cloud gateway'''
         response = self.api_pool.request("POST", "/prod/job/" + requestId, body=payload, headers=headers)
         LOGGER.info('API Pool Status: %d conn, %d requests', self.api_pool.num_connections, self.api_pool.num_requests)
         return response.data.decode("utf-8")
 
     def sendMeshCommand(self, headers, payload):
+        '''Send one command to the mesh over HTTP'''
         if self.mesh_pool is None: self.initMeshPool()
         response = self.mesh_pool.request("POST", "/comm", body=payload, headers=headers)
         LOGGER.info('Mesh Pool Status: %d conn, %d requests', self.mesh_pool.num_connections, self.mesh_pool.num_requests)
         return response.data.decode("utf-8")
 
 class HTTPCallback(BaseHTTPRequestHandler):
+    '''HTTP handler functions for the local HTTP server'''
     def send_cors_response(self, code, message, body):
         self.send_response(code, message)
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -185,11 +189,13 @@ class HTTPCallback(BaseHTTPRequestHandler):
 
 
 class MDNSListener:
+    '''MDNS management ... mainly looking for mesh gateway node'''
     def remove_service(self, zeroconf, type, name):
+        '''Remove MDNS service'''
         LOGGER.info("Service removed: %s", name)
 
     def add_service(self, zeroconf, type, name):
-        info = ZERO_CONF.get_service_info(type, name)
+        '''Add MDNS service'''
         LOGGER.info('Service added: %s, ip: %s', name, ZERO_CONF.cache.entries_with_name(name))
 
 
