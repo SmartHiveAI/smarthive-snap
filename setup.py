@@ -17,7 +17,7 @@ def get_long_description():
 
 setup(
     name=PACKAGE_NAME,
-    version='0.0.18',
+    version='0.0.19',
     author='SmartHive Automation',
     author_email='dev@smarthive.ai',
     description='SmartHive Cloud Controller',
