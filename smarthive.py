@@ -53,7 +53,7 @@ def check_provisioned():
             MQTT_HOST = SH_CONFIG.get('default', 'MQTT_HOST').strip()
             MQTT_PORT = int(SH_CONFIG.get('default', 'MQTT_PORT'))
             API_GATEWAY = SH_CONFIG.get('default', 'API_GATEWAY')
-            SU_LIST = SH_CONFIG.get('default', 'SU_LIST').split(",")
+            SU_LIST = list(json.loads(SH_CONFIG.get('default', 'SU_LIST')).values())
             is_provisioned = True
         except Exception as e:
             LOGGER.info('Configuration read Error: %s', str(e))
