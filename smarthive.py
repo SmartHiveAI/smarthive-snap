@@ -146,6 +146,9 @@ class HTTPCallback(BaseHTTPRequestHandler):
             if is_provisioned is True and auth_token is None:
                 self.send_cors_response(400, 'Bad request', 'Device already provisioned')
                 return
+            elif is_provisioned is True and auth_token is not None and 'SmartHive00' in SU_LIST:
+                # 'SmartHive00' - default factory provisioned, not claimed yet, will be removed once claimed
+                pass
             elif is_provisioned is True and auth_token is not None and auth_token not in SU_LIST:
                 self.send_cors_response(400, 'Bad request', 'Invalid credentials. Contact device owner.')
                 return
