@@ -150,6 +150,13 @@ class HTTPCallback(BaseHTTPRequestHandler):
                 self.send_cors_response(400, 'Bad request', 'Invalid credentials. Contact device owner.')
                 return
 
+            '''
+            Provisioning request:
+            curl                                                                                                    \
+                -F 'rootCert=@root.crt' -F 'deviceCert=@device.crt' -F 'privateKey=@private.key'                    \
+                -F 'mqttHost=xxxx' -F 'mqttPort=yyyy' -F 'apiGateway=zzzz' -F 'suList=aaaa,bbbb'                    \
+                http://smarthive-clc.local:4545/
+            '''
             if is_provisioned is False:
                 try:
                     self.save_cert('rootCert', form_data, ROOT_CA)
