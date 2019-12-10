@@ -116,7 +116,7 @@ class HTTPCallback(BaseHTTPRequestHandler):
 
     def do_GET(self):
         auth_token = self.headers['X-Auth-Token']
-        if SU_LIST != None and auth_token not in SU_LIST:
+        if SU_LIST != None and (auth_token not in SU_LIST and 'SmartHive00' not in SU_LIST):
             self.send_cors_response(400, 'Bad request', 'Invalid credentials. Contact device owner.')
             return
         configJson = json.dumps(dict(SH_CONFIG.items('default')))
@@ -182,7 +182,7 @@ class HTTPCallback(BaseHTTPRequestHandler):
                 SH_CONFIG.set('default', 'PRIVATE_KEY', PRIVATE_KEY)
                 with open(CONFIG_FILE, 'w') as configfile: SH_CONFIG.write(configfile)
                 if check_provisioned() == True: PubSubHelper()
-                self.send_cors_response(200, 'ok', 'Device provisioning successsful')
+                self.send_cors_response(200, 'ok', '{ "message": "Device provisioning successsful" }')
                 return
             except Exception as e:
                 LOGGER.error('Could not save config: %s', str(e))
