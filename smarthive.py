@@ -15,6 +15,7 @@ from urllib3 import HTTPConnectionPool, HTTPSConnectionPool
 from zeroconf import ServiceInfo, ServiceBrowser, Zeroconf
 import AWSIoTPythonSDK
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
+import time, threading
 
 SNAP_COMMON = os.environ['SNAP_COMMON']
 CONFIG_FOLDER = SNAP_COMMON
@@ -29,6 +30,7 @@ MQTT_PORT = 0  # 8883
 API_GATEWAY = ''  # "xxx.execute-api.zzz.amazonaws.com"
 CLIENT_ID = (':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff) for ele in range(0, 8*6, 8)][::-1]))
 TOPIC = "smarthive/" + CLIENT_ID.replace(":", "")
+HEARTBEAT_TOPIC = "smarthive/heartbeat"
 
 SH_CONFIG = configparser.ConfigParser()
 SU_LIST = None
@@ -220,9 +222,10 @@ class PubSubHelper:
         self.mqtt_client.enableMetricsCollection()
         self.mqtt_client.connect(60)
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
+        heartbeat()
         # time.sleep(2)
 
-    def mqtt_publish(self, message):
+    def mqtt_publish(self, topic, message):
         '''Send data over MQTT'''
         message_str = json.dumps(message)
         self.mqtt_client.publish(TOPIC, message_str, 1)
@@ -262,6 +265,15 @@ class PubSubHelper:
             LOGGER.info('Response from API GW: %s', api_response)
         except Exception as e:
             LOGGER.error("pass_thru_command Error: %s", str(e))
+    
+    def heartbeat():
+        try:
+            message = "{" + CLIENT_ID.replace(":", "") + ":OK}"
+            LOGGER.info('Sending HEARTBEAT: %s', mesaage)
+            mqtt_publish(HEARTBEAT_TOPIC, message)
+            threading.Timer(180, heartbeat).start()
+        except Exception as e:
+            LOGGER.info('Failed to send heartbeat: %s', str(e))
 
 
 def get_local_address():
@@ -278,6 +290,8 @@ def get_local_address():
         sock_fd.close()
         LOGGER.info("External connect fallback IP Address: %s", ip_addr)
     return ip_addr
+
+
 
 def main():
     '''Main entry point - configures and starts - logger, mdns, provisioning check and http'''
@@ -300,6 +314,7 @@ def main():
     local_svr = HTTPServer(("", LOCAL_PORT), HTTPCallback)
     httpthread = threading.Thread(target=local_svr.serve_forever)
     httpthread.start()
+    PubSubHelper().mqtt_publish()
 
 
 if __name__ == "__main__":
