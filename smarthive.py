@@ -265,7 +265,7 @@ class PubSubHelper:
         except Exception as e:
             LOGGER.error("pass_thru_command Error: %s", str(e))
     
-    def heartbeat():
+    def heartbeat(self):
         try:
             payload = {'headers': {'X-Dest-Nodes': 'ffffffffffff', 'X-Auth-Token': 'SmartHive00'}, 'content': '{"command":"get_mesh_config"}'}
             LOGGER.info('Sending HEARTBEAT: %s', json.dumps(payload))
