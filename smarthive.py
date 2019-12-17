@@ -221,7 +221,7 @@ class PubSubHelper:
         self.mqtt_client.enableMetricsCollection()
         self.mqtt_client.connect(60)
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
-        heartbeat()
+        self.heartbeat()
         # time.sleep(2)
 
     def mqtt_publish(self, topic, message):
