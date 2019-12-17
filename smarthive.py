@@ -30,7 +30,6 @@ MQTT_PORT = 0  # 8883
 API_GATEWAY = ''  # "xxx.execute-api.zzz.amazonaws.com"
 CLIENT_ID = (':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff) for ele in range(0, 8*6, 8)][::-1]))
 TOPIC = "smarthive/" + CLIENT_ID.replace(":", "")
-HEARTBEAT_TOPIC = "smarthive/heartbeat"
 
 SH_CONFIG = configparser.ConfigParser()
 SU_LIST = None
@@ -268,10 +267,10 @@ class PubSubHelper:
     
     def heartbeat():
         try:
-            message = "{" + CLIENT_ID.replace(":", "") + ":OK}"
-            LOGGER.info('Sending HEARTBEAT: %s', mesaage)
-            mqtt_publish(HEARTBEAT_TOPIC, message)
-            threading.Timer(180, heartbeat).start()
+            payload = {'headers': {'X-Dest-Nodes': 'ffffffffffff', 'X-Auth-Token': 'SmartHive00'}, 'content': '{"command":"get_mesh_config"}'}
+            LOGGER.info('Sending HEARTBEAT: %s', json.dumps(payload))
+            mqtt_publish(TOPIC, json.dumps(payload))
+            threading.Timer(60, heartbeat).start()
         except Exception as e:
             LOGGER.info('Failed to send heartbeat: %s', str(e))
 
@@ -314,7 +313,6 @@ def main():
     local_svr = HTTPServer(("", LOCAL_PORT), HTTPCallback)
     httpthread = threading.Thread(target=local_svr.serve_forever)
     httpthread.start()
-    PubSubHelper().mqtt_publish()
 
 
 if __name__ == "__main__":
