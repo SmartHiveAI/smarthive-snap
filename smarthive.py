@@ -195,11 +195,11 @@ class MDNSListener:
     '''MDNS management ... mainly looking for mesh gateway node'''
     def remove_service(self, zeroconf, type, name):
         '''Remove MDNS service'''
-        LOGGER.info("Service removed: %s", name)
+        LOGGER.debug("Service removed: %s", name)
 
     def add_service(self, zeroconf, type, name):
         '''Add MDNS service'''
-        LOGGER.info('Service added: %s, ip: %s', name, ZERO_CONF.cache.entries_with_name(name))
+        LOGGER.debug('Service added: %s, ip: %s', name, ZERO_CONF.cache.entries_with_name(name))
 
 
 class PubSubHelper:
@@ -265,13 +265,19 @@ class PubSubHelper:
 
 
 def get_local_address():
-    '''Get local LAN address'''
-    sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock_fd.connect(("www.amazon.com", 80))
-    res = sock_fd.getsockname()[0]
-    sock_fd.close()
-    return res
-
+    ip_addr = ''
+    try:
+        ip_addr = socket.gethostbyname_ex(socket.gethostname())[-1][1]
+        LOGGER.info("Local IP address: %s", ip_addr)
+    except Exception as e:
+        LOGGER.error("No Ip from gethostbyname_ex: %s", str(e))
+    if len(ip_addr) == 0:
+        sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock_fd.connect(("www.google.com", 80))
+        ip_addr = sock_fd.getsockname()[0]
+        sock_fd.close()
+        LOGGER.info("External connect fallback IP Address: %s", ip_addr)
+    return ip_addr
 
 def main():
     '''Main entry point - configures and starts - logger, mdns, provisioning check and http'''
