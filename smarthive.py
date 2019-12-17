@@ -219,7 +219,7 @@ class PubSubHelper:
         self.mqtt_client.configureConnectDisconnectTimeout(10)  # 10 sec
         self.mqtt_client.configureMQTTOperationTimeout(5)  # 5 sec
         self.mqtt_client.enableMetricsCollection()
-        self.mqtt_client.connect(60)
+        self.mqtt_client.connect(600)
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
         self.heartbeat()
         # time.sleep(2)
@@ -256,21 +256,24 @@ class PubSubHelper:
                     if mesh_response is None: mesh_response = {}
                     mesh_headers = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['content'][command_id]['hub'].replace(":", ""), 'X-Auth-Token': payload['headers']['X-Auth-Token']}
                     mesh_response[command_id] = self.send_one_command(mesh_headers, payload['content'][command_id])
-            api_status_payload = {}
-            api_headers = {'Content-type': 'application/json'}
-            api_status_payload["status"] = "completed"
-            api_status_payload["payload"] = json.dumps(mesh_response)
-            api_response = self.conn_mgr.sendJobStatusRequest(payload['requestId'], api_headers, json.dumps(api_status_payload))
-            LOGGER.info('Response from API GW: %s', api_response)
+            if 'requestId' in payload:
+                api_status_payload = {}
+                api_headers = {'Content-type': 'application/json'}
+                api_status_payload["status"] = "completed"
+                api_status_payload["payload"] = json.dumps(mesh_response)
+                api_response = self.conn_mgr.sendJobStatusRequest(payload['requestId'], api_headers, json.dumps(api_status_payload))
+                LOGGER.info('Response from API GW: %s', api_response)
+            else:
+                LOGGER.info('Heartbeat command')
         except Exception as e:
             LOGGER.error("pass_thru_command Error: %s", str(e))
-    
+
     def heartbeat(self):
         try:
-            payload = {'headers': {'X-Dest-Nodes': 'ffffffffffff', 'X-Auth-Token': 'SmartHive00'}, 'content': '{"command":"get_mesh_config"}'}
-            LOGGER.info('Sending HEARTBEAT: %s', json.dumps(payload))
-            mqtt_publish(TOPIC, json.dumps(payload))
-            threading.Timer(60, heartbeat).start()
+            payload = {'headers': {'X-Dest-Nodes': 'ffffffffffff', 'X-Auth-Token': 'SmartHive00'}, 'content': {'command': 'get_mesh_config'}}
+            LOGGER.info('Sending HEARTBEAT: %s', payload)
+            self.mqtt_publish(TOPIC, payload)
+            threading.Timer(180, self.heartbeat).start()
         except Exception as e:
             LOGGER.info('Failed to send heartbeat: %s', str(e))
 
