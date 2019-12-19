@@ -219,7 +219,7 @@ class PubSubHelper:
         self.mqtt_client.configureConnectDisconnectTimeout(10)  # 10 sec
         self.mqtt_client.configureMQTTOperationTimeout(5)  # 5 sec
         self.mqtt_client.enableMetricsCollection()
-        self.mqtt_client.connect(600)
+        self.mqtt_client.connect(1200)
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
         self.heartbeat()
         # time.sleep(2)
@@ -273,7 +273,7 @@ class PubSubHelper:
             payload = {'headers': {'X-Dest-Nodes': 'ffffffffffff', 'X-Auth-Token': 'SmartHive00'}, 'content': {'command': 'get_mesh_config'}}
             LOGGER.info('Sending HEARTBEAT: %s', payload)
             self.mqtt_publish(TOPIC, payload)
-            threading.Timer(180, self.heartbeat).start()
+            threading.Timer(900, self.heartbeat).start()
         except Exception as e:
             LOGGER.info('Failed to send heartbeat: %s', str(e))
 
