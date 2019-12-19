@@ -219,10 +219,18 @@ class PubSubHelper:
         self.mqtt_client.configureConnectDisconnectTimeout(10)  # 10 sec
         self.mqtt_client.configureMQTTOperationTimeout(5)  # 5 sec
         self.mqtt_client.enableMetricsCollection()
+        self.mqtt_client.onOffline = self.onOffline_callback
+        self.mqtt_client.onOnline = self.onOnline_callback
         self.mqtt_client.connect(60)
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
         #self.heartbeat()
         # time.sleep(2)
+
+    def onOffline_callback(self):
+        LOGGER.info("<------MQTT OFFLINE------>")
+
+    def onOnline_callback(self):
+        LOGGER.info("<------MQTT ONLINE------>")
 
     def mqtt_publish(self, topic, message):
         '''Send data over MQTT'''
