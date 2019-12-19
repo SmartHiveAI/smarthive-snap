@@ -219,9 +219,9 @@ class PubSubHelper:
         self.mqtt_client.configureConnectDisconnectTimeout(10)  # 10 sec
         self.mqtt_client.configureMQTTOperationTimeout(5)  # 5 sec
         self.mqtt_client.enableMetricsCollection()
-        self.mqtt_client.connect(1200)
+        self.mqtt_client.connect(60)
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
-        self.heartbeat()
+        #self.heartbeat()
         # time.sleep(2)
 
     def mqtt_publish(self, topic, message):
