@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import socket
 import threading
 from urllib3 import HTTPConnectionPool, HTTPSConnectionPool
-from zeroconf import ServiceInfo, ServiceBrowser, Zeroconf
+from zeroconf import ServiceInfo, ServiceBrowser, Zeroconf, DNSAddress
 import AWSIoTPythonSDK
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 import time, threading
@@ -201,6 +201,10 @@ class MDNSListener:
     def add_service(self, zeroconf, type, name):
         '''Add MDNS service'''
         LOGGER.debug('Service added: %s, ip: %s', name, ZERO_CONF.cache.entries_with_name(name))
+        cache = ZERO_CONF.cache.cache
+        for key in cache.keys():
+            if isinstance(cache[key][0], DNSAddress):
+                LOGGER.info('mDNS: %s - %s', key, cache[key])
 
 
 class PubSubHelper:
