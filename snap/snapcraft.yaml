@@ -1,9 +1,8 @@
 name: smarthive
 base: core18
-version: '0.0.20'
+version: '0.0.21'
 summary: Smart Hive Cloud controller
-description: |
-    Smart Hive Cloud controller snap
+description: Smart Hive Cloud controller snap
 
 grade: stable
 confinement: strict
@@ -25,6 +24,6 @@ parts:
       - python-gssapi
     python-packages:
       - AWSIoTPythonSDK
-      - zeroconf
+      - zeroconf>=0.24.4
       - configparser
       - urllib3
