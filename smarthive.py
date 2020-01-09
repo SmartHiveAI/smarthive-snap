@@ -345,7 +345,7 @@ class HTTPHelper(BaseHTTPRequestHandler):
                 SH_CONFIG.set('default', 'PRIVATE_KEY', PRIVATE_KEY)
                 with open(CONFIG_FILE, 'w') as configfile:
                     SH_CONFIG.write(configfile)
-                    LOGGER.info('Saved New config: %s', e)
+                    LOGGER.info('Saved New config: %s', configfile)
                 if check_prov_and_load_config() is True: # reload configuration
                     global MQTT_HELPER
                     if MQTT_HELPER is not None:
