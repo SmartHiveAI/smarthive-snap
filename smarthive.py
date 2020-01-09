@@ -86,14 +86,21 @@ class MQTTHelper:
 
     def mqtt_callback(self, client, userdata, message):
         '''Received data over MQTT'''
-        LOGGER.info("Received message [%s]: %s", message.topic, message.payload.decode("utf-8"))
+        LOGGER.info("Received message on topic: [%s]", message.topic)
+        LOGGER.debug("Received message [%s]: %s", message.topic, message.payload.decode("utf-8"))
         self.pass_thru_command(message.payload)
 
     def send_one_command(self, headers, command):
         '''Send on command to the mesh gateway over HTTP'''
-        LOGGER.info('Command for Mesh Root: %s', command)
+        LOGGER.debug('Command for Mesh Root: %s', command)
         mesh_response = self.conn_mgr.sendMeshCommand(headers, json.dumps(command))
-        LOGGER.info('Response from Mesh Root: %s', mesh_response)
+        LOGGER.debug('Response from Mesh Root: %s', mesh_response)
+        try:
+            res_obj = json.loads(mesh_response)
+            hub = next(iter(res_obj))
+            LOGGER.info('Command: %s, Hub: %s, Status: %d', command['command'], hub, res_obj[hub]['status'])
+        except:
+            pass
         return mesh_response
 
     def pass_thru_command(self, content):
@@ -111,6 +118,7 @@ class MQTTHelper:
                         mesh_response = {}
                     mesh_headers = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['content'][command_id]['hub'].replace(":", ""), 'X-Auth-Token': payload['headers']['X-Auth-Token']}
                     mesh_response[command_id] = self.send_one_command(mesh_headers, payload['content'][command_id])
+
             if 'requestId' in payload:
                 api_status_payload = {}
                 api_headers = {'Content-type': 'application/json'}
@@ -174,12 +182,12 @@ class MDNSHelper:
             value = cache.get(name.lower() + ".local.")
             if value is not None and len(value) > 0 and isinstance(value[0], DNSAddress):
                 ip_addr = socket.inet_ntoa(value[0].address)
-                LOGGER.info("Cache: %s - %s", name, ip_addr)
+                LOGGER.debug("Cache: %s - %s", name, ip_addr)
             if ip_addr is None:
                 info = MDNSHelper.zeroconf.get_service_info("_http._tcp.local.", name + "._http._tcp.local.")
                 if info is not None:
                     ip_addr = socket.inet_ntoa(info.address)
-                    LOGGER.info("Active resolution: %s - %s", name, ip_addr)
+                    LOGGER.debug("Active resolution: %s - %s", name, ip_addr)
         except Exception as e_fail:
             LOGGER.error("Could not resolve service: %s - %s", name, str(e_fail))
         return ip_addr
