@@ -15,6 +15,8 @@ from urllib3 import HTTPSConnectionPool
 from zeroconf import ServiceInfo, Zeroconf, DNSAddress
 import AWSIoTPythonSDK
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
+from random import choice
+from string import ascii_uppercase
 
 # Logging configuration
 LOGGER = logging.getLogger("SHive")
@@ -86,38 +88,39 @@ class MQTTHelper:
 
     def mqtt_callback(self, client, userdata, message):
         '''Received data over MQTT'''
-        LOGGER.info("Received message on topic: [%s]", message.topic)
-        LOGGER.debug("Received message [%s]: %s", message.topic, message.payload.decode("utf-8"))
-        self.pass_thru_command(message.payload)
+        trace_id = ''.join(choice(ascii_uppercase) for i in range(20))
+        LOGGER.info("[T: %s] Received message on topic: [%s]", trace_id, message.topic)
+        LOGGER.debug("[T: %s] Received message [%s]: %s", trace_id, message.topic, message.payload.decode("utf-8"))
+        self.pass_thru_command(trace_id, message.payload)
 
-    def send_one_command(self, headers, command):
+    def send_one_command(self, trace_id, headers, command):
         '''Send on command to the mesh gateway over HTTP'''
-        LOGGER.debug('Command for Mesh Root: %s', command)
+        LOGGER.debug('[T: %s] Command for Mesh Root: %s', trace_id, command)
         mesh_response = self.conn_mgr.sendMeshCommand(headers, json.dumps(command))
-        LOGGER.debug('Response from Mesh Root: %s', mesh_response)
+        LOGGER.debug('[T: %s] Response from Mesh Root: %s', trace_id, mesh_response)
         try:
             res_obj = json.loads(mesh_response)
             hub = next(iter(res_obj))
-            LOGGER.info('Command: %s, Hub: %s, Status: %d', command['command'], hub, res_obj[hub]['status'])
+            LOGGER.info('[T: %s] Command: %s, Hub: %s, Status: %d', trace_id, command['command'], hub, res_obj[hub]['status'])
         except:
             pass
         return mesh_response
 
-    def pass_thru_command(self, content):
+    def pass_thru_command(self, trace_id, content):
         '''Pass through command(s) received via MQTT to the Mesh'''
         payload = json.loads(content.decode("utf-8"))
         try:
             mesh_response = None
             if 'command' in payload['content']:
                 mesh_headers = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['headers']['X-Dest-Nodes'], 'X-Auth-Token': payload['headers']['X-Auth-Token']}
-                mesh_response = self.send_one_command(mesh_headers, payload['content'])
+                mesh_response = self.send_one_command(trace_id, mesh_headers, payload['content'])
             else:
                 # Hetero hub commands
                 for command_id in payload['content']:
                     if mesh_response is None:
                         mesh_response = {}
                     mesh_headers = {'Content-type': 'application/json', 'X-Dest-Nodes': payload['content'][command_id]['hub'].replace(":", ""), 'X-Auth-Token': payload['headers']['X-Auth-Token']}
-                    mesh_response[command_id] = self.send_one_command(mesh_headers, payload['content'][command_id])
+                    mesh_response[command_id] = self.send_one_command(trace_id, mesh_headers, payload['content'][command_id])
 
             if 'requestId' in payload:
                 api_status_payload = {}
@@ -125,7 +128,7 @@ class MQTTHelper:
                 api_status_payload["status"] = "completed"
                 api_status_payload["payload"] = json.dumps(mesh_response)
                 api_response = self.conn_mgr.sendJobStatusRequest(payload['requestId'], api_headers, json.dumps(api_status_payload))
-                LOGGER.info('Response from API GW: %s', api_response)
+                LOGGER.info('[T: %s] Response from API GW: %s', trace_id, api_response)
             else:
                 LOGGER.info('Heartbeat command')
         except Exception as e:
@@ -232,7 +235,7 @@ class HTTPConnPoolMgr:
 
     def __init__(self):
         LOGGER.info("Initializing HTTPS Connection Pool - Gateway: %s", API_GATEWAY)
-        self.api_pool = HTTPSConnectionPool(API_GATEWAY, port=443, maxsize=10, block=True, headers=None)
+        self.api_pool = HTTPSConnectionPool(API_GATEWAY, port=443, timeout=5, maxsize=10, block=True, headers=None)
 
     def cleanup(self):
         LOGGER.info('Cleanup: Connection Pool')
@@ -241,7 +244,7 @@ class HTTPConnPoolMgr:
     def sendJobStatusRequest(self, requestId, headers, payload):
         '''Send back job status to the Cloud gateway'''
         response = self.api_pool.request("POST", "/prod/job/" + requestId, body=payload, headers=headers)
-        LOGGER.info('API Pool Status: %d conn, %d requests', self.api_pool.num_connections, self.api_pool.num_requests)
+        LOGGER.debug('API Pool Status: %d conn, %d requests', self.api_pool.num_connections, self.api_pool.num_requests)
         return response.data.decode("utf-8")
 
     def sendMeshCommand(self, headers, payload):
