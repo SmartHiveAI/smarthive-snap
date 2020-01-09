@@ -16,7 +16,7 @@ from zeroconf import ServiceInfo, Zeroconf, DNSAddress
 import AWSIoTPythonSDK
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from random import choice
-from string import ascii_uppercase
+from string import ascii_lowercase
 
 # Logging configuration
 LOGGER = logging.getLogger("SHive")
@@ -88,22 +88,26 @@ class MQTTHelper:
 
     def mqtt_callback(self, client, userdata, message):
         '''Received data over MQTT'''
-        trace_id = ''.join(choice(ascii_uppercase) for i in range(20))
+        trace_id = ''.join(choice(ascii_lowercase) for i in range(20))
         LOGGER.info("[T: %s] Received message on topic: [%s]", trace_id, message.topic)
         LOGGER.debug("[T: %s] Received message [%s]: %s", trace_id, message.topic, message.payload.decode("utf-8"))
         self.pass_thru_command(trace_id, message.payload)
 
     def send_one_command(self, trace_id, headers, command):
-        '''Send on command to the mesh gateway over HTTP'''
-        LOGGER.debug('[T: %s] Command for Mesh Root: %s', trace_id, command)
-        mesh_response = self.conn_mgr.sendMeshCommand(headers, json.dumps(command))
-        LOGGER.debug('[T: %s] Response from Mesh Root: %s', trace_id, mesh_response)
+        mesh_response = '{ "Error": "Controller to Mesh Root Unavailable." }'
         try:
-            res_obj = json.loads(mesh_response)
-            hub = next(iter(res_obj))
-            LOGGER.info('[T: %s] Command: %s, Hub: %s, Status: %d', trace_id, command['command'], hub, res_obj[hub]['status'])
-        except:
-            pass
+            '''Send on command to the mesh gateway over HTTP'''
+            LOGGER.debug('[T: %s] Command for Mesh Root: %s', trace_id, command)
+            mesh_response = self.conn_mgr.sendMeshCommand(headers, json.dumps(command))
+            LOGGER.debug('[T: %s] Response from Mesh Root: %s', trace_id, mesh_response)
+            try:
+                res_obj = json.loads(mesh_response)
+                hub = next(iter(res_obj))
+                LOGGER.info('[T: %s] Command: %s, Hub: %s, Status: %d', trace_id, command['command'], hub, res_obj[hub]['status'])
+            except:
+                pass
+        except Exception as e_mesh:
+            LOGGER.info('[T: %s] Error: %s', trace_id, str(e_mesh))
         return mesh_response
 
     def pass_thru_command(self, trace_id, content):
