@@ -3,7 +3,6 @@ SmartHive Snap
 """
 import os
 import cgi
-import sys
 import json
 import uuid
 import logging
@@ -11,24 +10,25 @@ import configparser
 import http.client
 import socket
 import threading
-import AWSIoTPythonSDK
-from zeroconf import ServiceInfo, Zeroconf, DNSAddress
-from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib3 import HTTPSConnectionPool
-from http.server import HTTPServer
+from zeroconf import ServiceInfo, Zeroconf, DNSAddress
+import AWSIoTPythonSDK
+from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 
-SH_CONFIG = configparser.ConfigParser()
-
-LOGGER = logging.getLogger("SmartHive")
+# Logging configuration
+LOGGER = logging.getLogger("SHive")
 LOGGER.setLevel(logging.INFO)
 stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+stream_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s:%(lineno)-4d - %(message)s"))
 LOGGER.addHandler(stream_handler)
 
-MQTT_HOST = ''  # "xxx.iot.zzz.amazonaws.com"
-MQTT_PORT = 0  # 8883
-API_GATEWAY = ''  # "xxx.execute-api.zzz.amazonaws.com"
+# Global Vars
+SVC_NAME = "SmartHive-CLC"
+SVC_PORT = 4545
+MQTT_HOST = ''
+MQTT_PORT = 0
+API_GATEWAY = ''
 SU_LIST = None
 SNAP_COMMON = os.environ['SNAP_COMMON']
 CONFIG_FOLDER = SNAP_COMMON
@@ -39,15 +39,15 @@ CERT_FILE = CONFIG_FOLDER + "/certs/CLC_CERT.pem.crt"
 CLIENT_ID = (':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff) for ele in range(0, 8*6, 8)][::-1]))
 TOPIC = "smarthive/" + CLIENT_ID.replace(":", "")
 
-SVC_NAME = "SmartHive-CLC"
-SVC_PORT = 4545
+SH_CONFIG = configparser.ConfigParser()
+MQTT_HELPER = None
 
 class MQTTHelper:
     '''Helper class to receive commands over MQTT, pass through to Mesh and respond back to the cloud gateway'''
 
     def __init__(self):
         self.conn_mgr = HTTPConnPoolMgr()
-        LOGGER.info("MQTT config - ClientId: %s, Topic: %s", CLIENT_ID, TOPIC)
+        LOGGER.info("Initializing MQTT - ClientId: %s, Topic: %s", CLIENT_ID, TOPIC)
         self.mqtt_client = None
         self.mqtt_client = AWSIoTMQTTClient(CLIENT_ID)
         self.mqtt_client.configureEndpoint(MQTT_HOST, MQTT_PORT)
@@ -64,6 +64,13 @@ class MQTTHelper:
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
         # self.heartbeat()
         # time.sleep(2)
+
+    def cleanup(self):
+        LOGGER.info('Cleanup: MQTT')
+        self.conn_mgr.cleanup()
+        del self.conn_mgr
+        self.mqtt_client.unsubscribe(TOPIC)
+        self.mqtt_client.disconnect()
 
     def onOffline_callback(self):
         LOGGER.info("<------MQTT OFFLINE------>")
@@ -138,10 +145,10 @@ class MDNSHelper:
         self.zeroconf.register_service(self.info)
         LOGGER.info("Local mDNS on domain: %s", SVC_NAME)
 
-    # def __del__(self):
-    #    LOGGER.info("Unregistering ...")
-    #    self.zeroconf.unregister_service(self.info)
-    #    self.zeroconf.close()
+    def cleanup(self):
+        LOGGER.info("Cleanup: MDNS")
+        self.zeroconf.unregister_service(self.info)
+        self.zeroconf.close()
 
     def get_local_address(self):
         '''Try to get local address'''
@@ -167,18 +174,18 @@ class MDNSHelper:
             value = cache.get(name.lower() + ".local.")
             if value is not None and len(value) > 0 and isinstance(value[0], DNSAddress):
                 ip_addr = socket.inet_ntoa(value[0].address)
-                LOGGER.info("Cache - %s", ip_addr)
+                LOGGER.info("Cache: %s - %s", name, ip_addr)
             if ip_addr is None:
                 info = MDNSHelper.zeroconf.get_service_info("_http._tcp.local.", name + "._http._tcp.local.")
                 if info is not None:
                     ip_addr = socket.inet_ntoa(info.address)
-                    LOGGER.info("Active resolution - %s", ip_addr)
+                    LOGGER.info("Active resolution: %s - %s", name, ip_addr)
         except Exception as e_fail:
             LOGGER.error("Could not resolve service: %s - %s", name, str(e_fail))
         return ip_addr
 
 
-def check_provisioned():
+def check_prov_and_load_config():
     '''Check if Hub has been factory provisioned with the right certs'''
     is_provisioned = False
     cert_path = CONFIG_FOLDER + "/certs"
@@ -190,6 +197,7 @@ def check_provisioned():
         else:
             LOGGER.info("Created directory: %s", cert_path)
     if os.path.exists(CONFIG_FILE):
+        LOGGER.info("Loading Controller configurtion: %s", CONFIG_FILE)
         SH_CONFIG.read(CONFIG_FILE)
         try:
             global MQTT_HOST, MQTT_PORT, API_GATEWAY, SU_LIST
@@ -215,7 +223,12 @@ class HTTPConnPoolMgr:
     '''Manage Connection pools for the cloud gateway and the local mesh'''
 
     def __init__(self):
+        LOGGER.info("Initializing HTTPS Connection Pool - Gateway: %s", API_GATEWAY)
         self.api_pool = HTTPSConnectionPool(API_GATEWAY, port=443, maxsize=10, block=True, headers=None)
+
+    def cleanup(self):
+        LOGGER.info('Cleanup: Connection Pool')
+        self.api_pool.close()
 
     def sendJobStatusRequest(self, requestId, headers, payload):
         '''Send back job status to the Cloud gateway'''
@@ -256,7 +269,7 @@ class HTTPHelper(BaseHTTPRequestHandler):
             self.send_cors_response(400, 'Bad request', 'Invalid credentials. Contact device owner.')
             return
         configJson = json.dumps(dict(SH_CONFIG.items('default')))
-        LOGGER.info('Config data: %s', configJson)
+        LOGGER.debug('Config data: %s', configJson)
         self.send_cors_response(200, 'ok', configJson)
 
     def save_cert(self, fieldName, form_data, dstFileName):
@@ -278,7 +291,7 @@ class HTTPHelper(BaseHTTPRequestHandler):
             form_data = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']})
             auth_token = self.headers['X-Auth-Token']
             LOGGER.debug(form_data)
-            is_provisioned = check_provisioned()
+            is_provisioned = check_prov_and_load_config()
             if is_provisioned is True and auth_token is None:
                 self.send_cors_response(400, 'Bad request', 'Device already provisioned')
                 return
@@ -288,7 +301,6 @@ class HTTPHelper(BaseHTTPRequestHandler):
             elif is_provisioned is True and auth_token is not None and auth_token not in SU_LIST:
                 self.send_cors_response(400, 'Bad request', 'Invalid credentials. Contact device owner.')
                 return
-
             '''
             Provisioning request:
             curl                                                                                                    \
@@ -318,8 +330,14 @@ class HTTPHelper(BaseHTTPRequestHandler):
                 SH_CONFIG.set('default', 'PRIVATE_KEY', PRIVATE_KEY)
                 with open(CONFIG_FILE, 'w') as configfile:
                     SH_CONFIG.write(configfile)
-                if check_provisioned():
-                    sys.exit()
+                    LOGGER.info('Saved New config: %s', e)
+                if check_prov_and_load_config() is True: # reload configuration
+                    global MQTT_HELPER
+                    if MQTT_HELPER is not None:
+                        MQTT_HELPER.cleanup()
+                        del MQTT_HELPER
+                        MQTT_HELPER = None
+                    MQTT_HELPER = MQTTHelper()
                 self.send_cors_response(200, 'ok', '{ "message": "Device provisioning successsful" }')
                 return
             except Exception as e:
@@ -335,14 +353,16 @@ def main():
     # MDNS
     MDNSHelper()
     MDNSHelper.resolve_mdns("SmartHive-GW")
-    # while True:
-    #    mdns_helper.resolve_mdns("SmartHive-GW")
-    #    time.sleep(10)
-    # Check for provisioning status and config
-    is_provisioned = check_provisioned()
+    # MQTT
+    is_provisioned = check_prov_and_load_config()
     LOGGER.info("Provisioned status: %s", is_provisioned)
     if is_provisioned is True:
-        MQTTHelper()
+        global MQTT_HELPER
+        if MQTT_HELPER is not None:
+            MQTT_HELPER.cleanup()
+            del MQTT_HELPER
+            MQTT_HELPER = None
+        MQTT_HELPER = MQTTHelper()
     # Local http server
     local_svr = HTTPServer(("", SVC_PORT), HTTPHelper)
     httpthread = threading.Thread(target=local_svr.serve_forever)
