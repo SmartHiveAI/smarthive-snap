@@ -11,19 +11,19 @@ import http.client
 import socket
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from random import choice
+from string import ascii_lowercase
 from urllib3 import HTTPSConnectionPool
 from zeroconf import ServiceInfo, Zeroconf, DNSAddress
 import AWSIoTPythonSDK
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
-from random import choice
-from string import ascii_lowercase
 
 # Logging configuration
 LOGGER = logging.getLogger("SHive")
 LOGGER.setLevel(logging.INFO)
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s:%(lineno)-4d - %(message)s"))
-LOGGER.addHandler(stream_handler)
+STREAM_HANDLER = logging.StreamHandler()
+STREAM_HANDLER.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s:%(lineno)-4d - %(message)s"))
+LOGGER.addHandler(STREAM_HANDLER)
 
 # Global Vars
 SVC_NAME = "SmartHive-CLC"
