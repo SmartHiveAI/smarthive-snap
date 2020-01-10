@@ -255,8 +255,7 @@ class HTTPConnPoolMgr:
         '''Send one command to the mesh over HTTP'''
         gateway_host = MDNSHelper.resolve_mdns("SmartHive-GW")
         mesh_conn = http.client.HTTPConnection(gateway_host, 80)
-        #response = self.mesh_pool.request("POST", "/comm", body=payload, headers=headers)
-        mesh_conn.request("POST", "/comm", json.dumps(payload), headers)
+        mesh_conn.request("POST", "/comm", payload, headers)
         gw_response = mesh_conn.getresponse()
         return gw_response.read().decode("utf-8")
 
