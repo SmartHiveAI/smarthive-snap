@@ -19,7 +19,7 @@ import AWSIoTPythonSDK
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 
 # Logging configuration
-LOGGER = logging.getLogger("SHive")
+LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 STREAM_HANDLER = logging.StreamHandler()
 STREAM_HANDLER.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s:%(lineno)-4d - %(message)s"))
@@ -151,35 +151,53 @@ class MQTTHelper:
 
 class MDNSHelper:
     '''MDNS management ... mainly looking for mesh gateway node'''
-    ip_addr = ""
+    cur_addr = None
     zeroconf = Zeroconf()
     info = None
+    ttl = 120
 
     def __init__(self):
-        self.get_local_address()
-        self.info = ServiceInfo("_http._tcp.local.", SVC_NAME + "._http._tcp.local.", socket.inet_aton(self.ip_addr), SVC_PORT, 0, 0, {"version": "0.1"}, SVC_NAME + ".local.")
-        self.zeroconf.register_service(self.info)
+        self.cur_addr = self.get_local_address()
+        self.info = ServiceInfo("_http._tcp.local.", SVC_NAME + "._http._tcp.local.", socket.inet_aton(self.cur_addr), SVC_PORT, 0, 0, {"version": "0.1"}, SVC_NAME + ".local.")
+        self.zeroconf.register_service(self.info, ttl=self.ttl)
         LOGGER.info("Local mDNS on domain: %s", SVC_NAME)
+        self.checkSvc()
 
     def cleanup(self):
         LOGGER.info("Cleanup: MDNS")
         self.zeroconf.unregister_service(self.info)
         self.zeroconf.close()
 
+    def checkSvc(self):
+        threading.Timer(60.0, self.checkSvc).start()
+        cur_addr = self.get_local_address()
+        if cur_addr != self.cur_addr:
+            LOGGER.info("IP Change: From %s - %s", cur_addr, self.cur_addr)
+            cur_addr = self.cur_addr
+            self.zeroconf.unregister_service(self.info)
+            self.info = ServiceInfo("_http._tcp.local.", SVC_NAME + "._http._tcp.local.", socket.inet_aton(self.cur_addr), SVC_PORT, 0, 0, {"version": "0.1"}, SVC_NAME + ".local.")
+            self.zeroconf.register_service(self.info, ttl=self.ttl)
+        else:
+            LOGGER.info('No IP Change detected')
+        LOGGER.info("Resolve: SmartHive-GW  - %s", MDNSHelper.resolve_mdns("SmartHive-GW"))
+        LOGGER.info("Resolve: SmartHive-CLC - %s", MDNSHelper.resolve_mdns("SmartHive-CLC"))
+
     def get_local_address(self):
         '''Try to get local address'''
+        ip_addr = None
         try:
-            self.ip_addr = socket.gethostbyname_ex(socket.gethostname())[-1][1]
+            ip_addr = socket.gethostbyname_ex(socket.gethostname())[-1][1]
         except IndexError:
-            if len(self.ip_addr) == 0:
+            if ip_addr is None or len(ip_addr) == 0:
                 sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 sock_fd.connect(("www.google.com", 80))
-                self.ip_addr = sock_fd.getsockname()[0]
+                ip_addr = sock_fd.getsockname()[0]
                 sock_fd.close()
         except socket.error as e_sock:
             LOGGER.error("No Ip from gethostbyname_ex: %s", str(e_sock))
         finally:
-            LOGGER.info("Local IP address: %s", self.ip_addr)
+            LOGGER.info("Local IP address: %s", ip_addr)
+        return ip_addr
 
     @staticmethod
     def resolve_mdns(name):
@@ -346,7 +364,7 @@ class HTTPHelper(BaseHTTPRequestHandler):
                 with open(CONFIG_FILE, 'w') as configfile:
                     SH_CONFIG.write(configfile)
                     LOGGER.info('Saved New config: %s', configfile)
-                if check_prov_and_load_config() is True: # reload configuration
+                if check_prov_and_load_config() is True:  # reload configuration
                     global MQTT_HELPER
                     if MQTT_HELPER is not None:
                         MQTT_HELPER.cleanup()
@@ -361,12 +379,12 @@ class HTTPHelper(BaseHTTPRequestHandler):
                 return
         return
 
-MDNS_HELPER = MDNSHelper()
 
 def main():
     '''Main entry point - configures and starts - logger, mdns, provisioning check and http'''
     LOGGER.info('Starting SmartHive Cloud Controller ...')
     # MDNS
+    MDNSHelper()
     MDNSHelper.resolve_mdns("SmartHive-GW")
     # MQTT
     is_provisioned = check_prov_and_load_config()
