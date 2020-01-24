@@ -43,7 +43,7 @@ TOPIC = "smarthive/" + CLIENT_ID.replace(":", "")
 
 SH_CONFIG = configparser.ConfigParser()
 MQTT_HELPER = None
-MDNS_HELPER = None
+
 
 class MQTTHelper:
     '''Helper class to receive commands over MQTT, pass through to Mesh and respond back to the cloud gateway'''
@@ -347,17 +347,12 @@ class HTTPHelper(BaseHTTPRequestHandler):
                     SH_CONFIG.write(configfile)
                     LOGGER.info('Saved New config: %s', configfile)
                 if check_prov_and_load_config() is True: # reload configuration
-                    global MQTT_HELPER, MDNS_HELPER
+                    global MQTT_HELPER
                     if MQTT_HELPER is not None:
                         MQTT_HELPER.cleanup()
                         del MQTT_HELPER
                         MQTT_HELPER = None
                     MQTT_HELPER = MQTTHelper()
-                    if MDNS_HELPER is not None:
-                        MDNS_HELPER.cleanup()
-                        del MDNS_HELPER
-                        MDNS_HELPER = None
-                    MDNS_HELPER = MDNSHelper()
                 self.send_cors_response(200, 'ok', '{ "message": "Device provisioning successsful" }')
                 return
             except Exception as e:
@@ -366,12 +361,12 @@ class HTTPHelper(BaseHTTPRequestHandler):
                 return
         return
 
+MDNS_HELPER = MDNSHelper()
 
 def main():
     '''Main entry point - configures and starts - logger, mdns, provisioning check and http'''
     LOGGER.info('Starting SmartHive Cloud Controller ...')
     # MDNS
-    MDNS_HELPER = MDNSHelper()
     MDNSHelper.resolve_mdns("SmartHive-GW")
     # MQTT
     is_provisioned = check_prov_and_load_config()
