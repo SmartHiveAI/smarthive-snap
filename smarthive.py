@@ -157,10 +157,6 @@ class MDNSHelper:
     ttl = 120
 
     def __init__(self):
-        self.cur_addr = self.get_local_address()
-        self.info = ServiceInfo("_http._tcp.local.", SVC_NAME + "._http._tcp.local.", socket.inet_aton(self.cur_addr), SVC_PORT, 0, 0, {"version": "0.1"}, SVC_NAME + ".local.")
-        self.zeroconf.register_service(self.info, ttl=self.ttl)
-        LOGGER.info("Local mDNS on domain: %s", SVC_NAME)
         self.checkSvc()
 
     def cleanup(self):
@@ -169,34 +165,42 @@ class MDNSHelper:
         self.zeroconf.close()
 
     def checkSvc(self):
-        threading.Timer(60.0, self.checkSvc).start()
         cur_addr = self.get_local_address()
-        if cur_addr != self.cur_addr:
-            LOGGER.info("IP Change: From %s - %s", cur_addr, self.cur_addr)
-            cur_addr = self.cur_addr
-            self.zeroconf.unregister_service(self.info)
-            self.info = ServiceInfo("_http._tcp.local.", SVC_NAME + "._http._tcp.local.", socket.inet_aton(self.cur_addr), SVC_PORT, 0, 0, {"version": "0.1"}, SVC_NAME + ".local.")
-            self.zeroconf.register_service(self.info, ttl=self.ttl)
+        if cur_addr is not None:
+            if self.cur_addr != cur_addr:
+                LOGGER.info("IP Change: From %s - %s", self.cur_addr, cur_addr)
+                self.cur_addr = cur_addr
+                if self.info is not None:
+                    self.zeroconf.unregister_service(self.info)
+                    self.zeroconf.close()
+                    self.zeroconf = Zeroconf()
+                self.info = ServiceInfo("_http._tcp.local.", SVC_NAME + "._http._tcp.local.", socket.inet_aton(self.cur_addr), SVC_PORT, 0, 0, {"version": "0.1"}, SVC_NAME + ".local.")
+                self.zeroconf.register_service(self.info, ttl=self.ttl)
+                LOGGER.info("Local mDNS on domain: %s", SVC_NAME)
+            else:
+                LOGGER.info('No IP Change detected')
+            LOGGER.info("Resolve: SmartHive-GW  - %s", MDNSHelper.resolve_mdns("SmartHive-GW"))
+            LOGGER.info("Resolve: SmartHive-CLC - %s", MDNSHelper.resolve_mdns("SmartHive-CLC"))
         else:
-            LOGGER.info('No IP Change detected')
-        LOGGER.info("Resolve: SmartHive-GW  - %s", MDNSHelper.resolve_mdns("SmartHive-GW"))
-        LOGGER.info("Resolve: SmartHive-CLC - %s", MDNSHelper.resolve_mdns("SmartHive-CLC"))
+            LOGGER.info("Not connected to network. Waiting 60 seconds ...")
+        threading.Timer(60.0, self.checkSvc).start()
 
     def get_local_address(self):
         '''Try to get local address'''
         ip_addr = None
         try:
             ip_addr = socket.gethostbyname_ex(socket.gethostname())[-1][1]
-        except IndexError:
+        except Exception as e_fail:
+            LOGGER.error("Exception get_local_address gethostbyname_ex : %s", str(e_fail))
+        try:
             if ip_addr is None or len(ip_addr) == 0:
                 sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 sock_fd.connect(("www.google.com", 80))
                 ip_addr = sock_fd.getsockname()[0]
                 sock_fd.close()
-        except socket.error as e_sock:
-            LOGGER.error("No Ip from gethostbyname_ex: %s", str(e_sock))
-        finally:
-            LOGGER.info("Local IP address: %s", ip_addr)
+        except Exception as e_fail:
+            LOGGER.error("Exception get_local_address connect: %s", str(e_fail))
+        LOGGER.info("Local IP address: %s", ip_addr)
         return ip_addr
 
     @staticmethod
