@@ -3,6 +3,7 @@ SmartHive Snap
 """
 import os
 import cgi
+import time
 import json
 import uuid
 import logging
@@ -65,8 +66,8 @@ class MQTTHelper:
         self.mqtt_client.onOnline = self.onOnline_callback
         self.mqtt_client.connect(60)
         self.mqtt_client.subscribe(TOPIC, 1, self.mqtt_callback)
-        # self.heartbeat()
-        # time.sleep(2)
+        self.heartbeat()
+        time.sleep(2)
 
     def cleanup(self):
         LOGGER.info('Cleanup: MQTT')
