@@ -159,37 +159,31 @@ class MDNSHelper:
     loopCounter = 0
 
     def __init__(self):
-        self.checkSvc()
+        self.checkSvc(0)
 
     def cleanup(self):
         LOGGER.info("Cleanup: MDNS")
         self.zeroconf.unregister_service(self.info)
         self.zeroconf.close()
 
-    def checkSvc(self):
-        self.loopCounter = self.loopCounter + 1
+    def checkSvc(self, loopCounter):
         cur_addr = self.get_local_address()
         gw_addr = MDNSHelper.resolve_mdns("SmartHive-GW")
         clc_addr = MDNSHelper.resolve_mdns("SmartHive-CLC")
         if cur_addr is not None:
-            if self.cur_addr != cur_addr or gw_addr is None or clc_addr is None or self.loopCounter > 5:
-                LOGGER.info("ReInit mDNS[%d]: %s, %s, %s, %s", self.loopCounter, self.cur_addr, cur_addr, gw_addr, clc_addr)
+            if self.cur_addr != cur_addr or gw_addr is None or clc_addr is None or loopCounter % 50 == 0:
+                LOGGER.info("[%d] ReInit mDNS: %s, %s, %s, %s", loopCounter, self.cur_addr, cur_addr, gw_addr, clc_addr)
                 self.cur_addr = cur_addr
-                self.loopCounter = 0
                 if self.info is not None:
                     self.zeroconf.unregister_service(self.info)
-                    self.zeroconf.close()
-                    LOGGER.info("Unregistered Service and will re-register")
-                    self.zeroconf = Zeroconf()
                 self.info = ServiceInfo("_http._tcp.local.", SVC_NAME + "._http._tcp.local.", socket.inet_aton(self.cur_addr), SVC_PORT, 0, 0, {"version": "0.1"}, SVC_NAME + ".local.")
                 self.zeroconf.register_service(self.info, ttl=self.ttl)
                 LOGGER.info("Local mDNS on domain: %s", SVC_NAME)
             else:
-                LOGGER.info("Local: %s, SmartHive-GW: %s, SmartHive-CLC: %s", cur_addr, gw_addr, clc_addr)
+                LOGGER.info("[%s] Local: %s, SmartHive-GW: %s, SmartHive-CLC: %s", loopCounter, cur_addr, gw_addr, clc_addr)
         else:
             LOGGER.info("Not connected to network. Waiting 60 seconds ...")
-        threading.Timer(31.0, self.checkSvc).start()
-        LOGGER.info("checkSvc done")
+        threading.Timer(31.0, self.checkSvc, [loopCounter + 1]).start()
 
     def get_local_address(self):
         '''Try to get local address'''
