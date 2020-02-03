@@ -182,10 +182,10 @@ class MDNSHelper:
                 self.zeroconf.register_service(self.info, ttl=self.ttl)
                 LOGGER.info("Local mDNS on domain: %s", SVC_NAME)
             else:
-                LOGGER.info("IPs: Local - %s, SmartHive-GW - %s, SmartHive-CLC - %s", cur_addr, gw_addr, clc_addr)
+                LOGGER.info("Local: %s, SmartHive-GW: %s, SmartHive-CLC: %s", cur_addr, gw_addr, clc_addr)
         else:
             LOGGER.info("Not connected to network. Waiting 60 seconds ...")
-        threading.Timer(60.0, self.checkSvc).start()
+        threading.Timer(61.0, self.checkSvc).start()
 
     def get_local_address(self):
         '''Try to get local address'''
