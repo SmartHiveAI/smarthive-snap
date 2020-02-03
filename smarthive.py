@@ -172,7 +172,7 @@ class MDNSHelper:
         clc_addr = MDNSHelper.resolve_mdns("SmartHive-CLC")
         if cur_addr is not None:
             if self.cur_addr != cur_addr or gw_addr is None or clc_addr is None or loopCounter % 50 == 0:
-                LOGGER.info("[%d] ReInit mDNS: %s, %s, %s, %s", loopCounter, self.cur_addr, cur_addr, gw_addr, clc_addr)
+                LOGGER.info("[%d] ReInit mDNS - Current: %s, Prev: %s, GW: %s, CLC: %s", loopCounter, self.cur_addr, cur_addr, gw_addr, clc_addr)
                 self.cur_addr = cur_addr
                 if self.info is not None:
                     self.zeroconf.unregister_service(self.info)
