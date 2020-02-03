@@ -202,7 +202,7 @@ class MDNSHelper:
                 sock_fd.connect(('10.255.255.255', 1))
                 ip_addr = sock_fd.getsockname()[0]
             except Exception as e_fail:
-                LOGGER.error("Exception get_local_address connect: %s", str(e_fail))
+                LOGGER.error("Exception 10.255.255.255 connect: %s", str(e_fail))
             finally:
                 sock_fd.close()
         if ip_addr is None or len(ip_addr) == 0:
@@ -212,7 +212,7 @@ class MDNSHelper:
                 ip_addr = sock_fd.getsockname()[0]
                 sock_fd.close()
             except Exception as e_fail:
-                LOGGER.error("Exception get_local_address connect: %s", str(e_fail))
+                LOGGER.error("Exception 8.8.8.8 connect: %s", str(e_fail))
             finally:
                 sock_fd.close()
         LOGGER.info("Local IP address: %s", ip_addr)
