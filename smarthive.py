@@ -176,6 +176,7 @@ class MDNSHelper:
                 if self.info is not None:
                     self.zeroconf.unregister_service(self.info)
                     self.zeroconf.close()
+                    LOGGER.info("Unregistered Service and will re-register")
                     self.zeroconf = Zeroconf()
                 self.info = ServiceInfo("_http._tcp.local.", SVC_NAME + "._http._tcp.local.", socket.inet_aton(self.cur_addr), SVC_PORT, 0, 0, {"version": "0.1"}, SVC_NAME + ".local.")
                 self.zeroconf.register_service(self.info, ttl=self.ttl)
