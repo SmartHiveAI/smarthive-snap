@@ -191,14 +191,13 @@ class MDNSHelper:
         '''Try to get local address'''
         ip_addr = None
         try:
-            LOGGER.info(socket.gethostname())
             ip_addr = socket.gethostbyname_ex(socket.gethostname())[-1][1]
         except Exception as e_fail:
             LOGGER.error("Exception get_local_address gethostbyname_ex : %s", str(e_fail))
         try:
             if ip_addr is None or len(ip_addr) == 0:
                 sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                sock_fd.connect(("www.google.com", 80))
+                sock_fd.connect(("8.8.8.8", 80))
                 ip_addr = sock_fd.getsockname()[0]
                 sock_fd.close()
         except Exception as e_fail:
