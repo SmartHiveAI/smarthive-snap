@@ -181,8 +181,7 @@ class MDNSHelper:
                 self.zeroconf.register_service(self.info, ttl=self.ttl)
                 LOGGER.info("Local mDNS on domain: %s", SVC_NAME)
             else:
-                LOGGER.info("Resolve: SmartHive-GW  - %s", gw_addr)
-                LOGGER.info("Resolve: SmartHive-CLC - %s", clc_addr)
+                LOGGER.info("IPs: Local - %s, SmartHive-GW - %s, SmartHive-CLC - %s", cur_addr, gw_addr, clc_addr)
         else:
             LOGGER.info("Not connected to network. Waiting 60 seconds ...")
         threading.Timer(60.0, self.checkSvc).start()
@@ -215,7 +214,6 @@ class MDNSHelper:
                 LOGGER.error("Exception 8.8.8.8 connect: %s", str(e_fail))
             finally:
                 sock_fd.close()
-        LOGGER.info("Local IP address: %s", ip_addr)
         return ip_addr
 
     @staticmethod
