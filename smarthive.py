@@ -190,18 +190,31 @@ class MDNSHelper:
     def get_local_address(self):
         '''Try to get local address'''
         ip_addr = None
+        '''
         try:
             ip_addr = socket.gethostbyname_ex(socket.gethostname())[-1][1]
         except Exception as e_fail:
             LOGGER.error("Exception get_local_address gethostbyname_ex : %s", str(e_fail))
-        try:
-            if ip_addr is None or len(ip_addr) == 0:
-                sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        '''
+        if ip_addr is None or len(ip_addr) == 0:
+            sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                sock_fd.connect(('10.255.255.255', 1))
+                ip_addr = sock_fd.getsockname()[0]
+            except Exception as e_fail:
+                LOGGER.error("Exception get_local_address connect: %s", str(e_fail))
+            finally:
+                sock_fd.close()
+        if ip_addr is None or len(ip_addr) == 0:
+            sock_fd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
                 sock_fd.connect(("8.8.8.8", 80))
                 ip_addr = sock_fd.getsockname()[0]
                 sock_fd.close()
-        except Exception as e_fail:
-            LOGGER.error("Exception get_local_address connect: %s", str(e_fail))
+            except Exception as e_fail:
+                LOGGER.error("Exception get_local_address connect: %s", str(e_fail))
+            finally:
+                sock_fd.close()
         LOGGER.info("Local IP address: %s", ip_addr)
         return ip_addr
 
