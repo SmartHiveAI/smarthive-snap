@@ -172,8 +172,8 @@ class MDNSHelper:
         gw_addr = MDNSHelper.resolve_mdns("SmartHive-GW")
         clc_addr = MDNSHelper.resolve_mdns("SmartHive-CLC")
         if cur_addr is not None:
-            if self.cur_addr != cur_addr or gw_addr is None or clc_addr is None or self.loopCounter > 10:
-                LOGGER.info("ReInit mDNS: %s, %s, %s, %s", self.cur_addr, cur_addr, gw_addr, clc_addr)
+            if self.cur_addr != cur_addr or gw_addr is None or clc_addr is None or self.loopCounter > 5:
+                LOGGER.info("ReInit mDNS[%d]: %s, %s, %s, %s", self.loopCounter, self.cur_addr, cur_addr, gw_addr, clc_addr)
                 self.cur_addr = cur_addr
                 self.loopCounter = 0
                 if self.info is not None:
@@ -189,6 +189,7 @@ class MDNSHelper:
         else:
             LOGGER.info("Not connected to network. Waiting 60 seconds ...")
         threading.Timer(31.0, self.checkSvc).start()
+        LOGGER.info("checkSvc done")
 
     def get_local_address(self):
         '''Try to get local address'''
