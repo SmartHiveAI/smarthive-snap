@@ -2,6 +2,7 @@
 SmartHive Snap
 """
 import os
+import sys
 import cgi
 import time
 import json
@@ -44,6 +45,10 @@ TOPIC = "smarthive/" + CLIENT_ID.replace(":", "")
 
 SH_CONFIG = configparser.ConfigParser()
 MQTT_HELPER = None
+
+
+def restartService():
+    os._exit(1)
 
 
 class MQTTHelper:
@@ -159,20 +164,24 @@ class MDNSHelper:
     loopCounter = 0
 
     def __init__(self):
-        self.checkSvc(0)
+        self.checkSvc(0, 0)
 
     def cleanup(self):
         LOGGER.info("Cleanup: MDNS")
         self.zeroconf.unregister_service(self.info)
         self.zeroconf.close()
 
-    def checkSvc(self, loopCounter):
+    def checkSvc(self, loopCounter, failCounter):
         cur_addr = self.get_local_address()
         gw_addr = MDNSHelper.resolve_mdns("SmartHive-GW")
         clc_addr = MDNSHelper.resolve_mdns("SmartHive-CLC")
         if cur_addr is not None:
             if self.cur_addr != cur_addr or gw_addr is None or clc_addr is None or loopCounter % 50 == 0:
-                LOGGER.info("[%d] ReInit mDNS - Current: %s, Prev: %s, GW: %s, CLC: %s", loopCounter, self.cur_addr, cur_addr, gw_addr, clc_addr)
+                failCounter = failCounter + 1
+                if failCounter > 5:
+                    LOGGER.info("Fail Counter threshold: %d - restarting", failCounter)
+                    restartService()
+                LOGGER.info("[%d / %d] ReInit mDNS - Current: %s, Prev: %s, GW: %s, CLC: %s", loopCounter, failCounter, self.cur_addr, cur_addr, gw_addr, clc_addr)
                 self.cur_addr = cur_addr
                 if self.info is not None:
                     self.zeroconf.unregister_service(self.info)
@@ -180,10 +189,10 @@ class MDNSHelper:
                 self.zeroconf.register_service(self.info, ttl=self.ttl)
                 LOGGER.info("Local mDNS on domain: %s", SVC_NAME)
             else:
-                LOGGER.info("[%s] Local: %s, SmartHive-GW: %s, SmartHive-CLC: %s", loopCounter, cur_addr, gw_addr, clc_addr)
+                LOGGER.info("[%d / %d] Local: %s, SmartHive-GW: %s, SmartHive-CLC: %s", loopCounter, failCounter, cur_addr, gw_addr, clc_addr)
         else:
             LOGGER.info("Not connected to network. Waiting 60 seconds ...")
-        threading.Timer(31.0, self.checkSvc, [loopCounter + 1]).start()
+        threading.Timer(31.0, self.checkSvc, args = [loopCounter + 1, failCounter]).start()
 
     def get_local_address(self):
         '''Try to get local address'''
